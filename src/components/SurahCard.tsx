@@ -1,17 +1,19 @@
 "use client";
 
 import { Surah } from "@/types/quran";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, Heart } from "lucide-react";
 
 interface SurahCardProps {
   surah: Surah;
   isSelected: boolean;
   isPlaying?: boolean;
   onSelect: (surah: Surah) => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: (surahId: number) => void;
   compact?: boolean;
 }
 
-export default function SurahCard({ surah, isSelected, isPlaying, onSelect, compact }: SurahCardProps) {
+export default function SurahCard({ surah, isSelected, isPlaying, onSelect, isFavorite, onToggleFavorite, compact }: SurahCardProps) {
   const isActive = isSelected && isPlaying;
   const isPaused = isSelected && !isPlaying;
 
@@ -38,37 +40,55 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
 
       {/* Info */}
       <div className="surah-info">
-        <span className="surah-name">{surah.name_simple}</span>
-        <span className="surah-translation">{surah.translated_name.name} · {surah.verses_count} versets</span>
+        <div className="surah-name-row">
+          <span className="surah-name">{surah.name_simple}</span>
+          <button 
+            className={`fav-btn-inline ${isFavorite ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite?.(surah.id);
+            }}
+            title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          >
+            <Heart size={14} fill={isFavorite ? "currentColor" : "none"} strokeWidth={2.5} />
+          </button>
+        </div>
+        <div className="surah-details">
+          <span className="surah-translation">{surah.translated_name.name}</span>
+          <span className="surah-verses-count">{surah.verses_count} versets</span>
+        </div>
       </div>
 
-      {/* Status indicator */}
-      <div className="status-indicator">
-        {isActive ? (
-          <div className="eq-bars">
-            <span /><span /><span /><span />
-          </div>
-        ) : isPaused ? (
+      {/* Status indicator / Resume button */}
+      <div className="status-container">
+        {isPaused && (
           <div className="eq-bars paused-bars">
             <span /><span /><span /><span />
           </div>
+        )}
+        
+        {isPaused ? (
+          <div className="resume-btn">
+            <div className="sparkle s1" />
+            <div className="sparkle s2" />
+            <div className="sparkle s3" />
+            <Play fill="currentColor" size={12} />
+            <span>Reprendre</span>
+          </div>
         ) : (
-          <div className="play-icon-wrap">
-            <Play fill="currentColor" size={14} />
+          <div className="status-indicator">
+            {isActive ? (
+              <div className="eq-bars">
+                <span /><span /><span /><span />
+              </div>
+            ) : (
+              <div className="play-icon-wrap">
+                <Play fill="currentColor" size={14} />
+              </div>
+            )}
           </div>
         )}
       </div>
-
-      {/* Resume button (paused only) */}
-      {isPaused && (
-        <div className="resume-btn">
-          <div className="sparkle s1" />
-          <div className="sparkle s2" />
-          <div className="sparkle s3" />
-          <Play fill="currentColor" size={12} />
-          <span>Reprendre</span>
-        </div>
-      )}
 
       {/* Arabic name */}
       {!isPaused && !compact && (
@@ -81,15 +101,16 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
         .surah-card {
           display: flex;
           align-items: center;
-          gap: 1rem;
-          padding: 0.85rem 1.25rem;
-          border-radius: 1rem;
+          gap: 1.25rem;
+          padding: 1.1rem 1.4rem;
+          border-radius: 1.1rem;
           cursor: pointer;
-          transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-          border: 1px solid transparent;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          border: 1px solid rgba(255, 255, 255, 0.03);
           position: relative;
-          background: rgba(15, 23, 42, 0.3);
+          background: rgba(15, 23, 42, 0.4);
           overflow: hidden;
+          user-select: none;
         }
 
         .surah-card.compact {
@@ -99,9 +120,10 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
         }
 
         .surah-card:hover {
-          background: rgba(56, 189, 248, 0.06);
-          border-color: rgba(56, 189, 248, 0.15);
-          transform: translateX(4px);
+          background: rgba(56, 189, 248, 0.08);
+          border-color: rgba(56, 189, 248, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
         }
 
         /* Selected (playing or paused) */
@@ -136,6 +158,14 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
           fill: rgba(239, 68, 68, 0.08);
         }
 
+        .status-container {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+          flex-shrink: 0;
+          z-index: 1;
+        }
+
         /* Animated glow behind active card */
         .active-glow {
           position: absolute;
@@ -156,6 +186,37 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
         @keyframes glowPulse {
           0%, 100% { opacity: 0.4; }
           50% { opacity: 1; }
+        }
+
+        /* Favorite Button */
+        .surah-name-row {
+          display: flex;
+          align-items: center;
+          gap: 0.6rem;
+        }
+
+        .fav-btn-inline {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(148, 163, 184, 0.3);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          background: transparent;
+          border: none;
+          padding: 4px;
+          border-radius: 50%;
+          cursor: pointer;
+        }
+
+        .fav-btn-inline:hover {
+          color: #f87171;
+          background: rgba(239, 68, 68, 0.08);
+          transform: scale(1.15);
+        }
+
+        .fav-btn-inline.active {
+          color: #f87171;
+          filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
         }
 
         /* Number */
@@ -221,14 +282,15 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
         }
 
         .surah-name {
-          font-size: 0.92rem;
+          font-size: 1.05rem;
           font-weight: 600;
           color: var(--text-primary);
           transition: color 0.2s;
+          letter-spacing: -0.2px;
         }
 
         .surah-card.compact .surah-name {
-          font-size: 0.85rem;
+          font-size: 0.9rem;
         }
 
         .surah-card.selected .surah-name {
@@ -236,10 +298,26 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
           font-weight: 700;
         }
 
+        .surah-details {
+          display: flex;
+          flex-direction: column;
+          margin-top: 4px;
+        }
+
         .surah-translation {
-          font-size: 0.72rem;
+          font-size: 0.78rem;
           color: var(--text-secondary);
+          opacity: 0.8;
+          line-height: 1.2;
+        }
+
+        .surah-verses-count {
+          font-size: 0.65rem;
+          color: var(--text-secondary);
+          opacity: 0.5;
           margin-top: 2px;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
         }
 
         /* Status indicator */
@@ -296,6 +374,9 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
         }
 
         /* Equalizer bars - Paused (frozen, red) */
+        .paused-bars {
+          margin-right: 0.25rem;
+        }
         .paused-bars span {
           animation: none !important;
           background: #f87171 !important;
@@ -311,11 +392,12 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
           flex-shrink: 0;
           transition: opacity 0.3s;
           z-index: 1;
+          margin-left: auto;
         }
 
         .arabic-name {
-          font-size: 1.1rem;
-          color: rgba(148, 163, 184, 0.4);
+          font-size: 1.2rem;
+          color: rgba(148, 163, 184, 0.35);
           font-weight: 400;
         }
 
@@ -332,10 +414,10 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, comp
           display: flex;
           align-items: center;
           gap: 0.4rem;
-          padding: 0.4rem 0.85rem;
+          padding: 0.45rem 0.9rem;
           border-radius: 2rem;
-          background: rgba(239, 68, 68, 0.12);
-          border: 1px solid rgba(248, 113, 113, 0.35);
+          background: rgba(239, 68, 68, 0.15);
+          border: 1px solid rgba(248, 113, 113, 0.4);
           color: #f87171;
           font-size: 0.75rem;
           font-weight: 700;

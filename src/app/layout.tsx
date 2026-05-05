@@ -21,6 +21,11 @@ const amiri = Amiri({
 export const metadata: Metadata = {
   title: "Quranify - Écoute du Saint Coran",
   description: "Application d'écoute du Saint Coran avec style glassmorphism.",
+  manifest: "/manifest.json",
+  icons: {
+    icon: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export default function RootLayout({

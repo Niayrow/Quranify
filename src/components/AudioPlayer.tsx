@@ -4,7 +4,7 @@ import React, { useRef, useState, useEffect, useCallback } from "react";
 import { 
   Play, Pause, SkipBack, SkipForward, 
   Volume2, VolumeX, Repeat, Shuffle, 
-  ChevronDown, BookOpen
+  ChevronDown, BookOpen, Clock
 } from "lucide-react";
 
 interface AudioPlayerProps {
@@ -37,6 +37,9 @@ export default function AudioPlayer({
   const [isRepeat, setIsRepeat] = useState(false);
   const [isShuffle, setIsShuffle] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [sleepTimer, setSleepTimer] = useState<number | null>(null); // in minutes
+  const [timeLeft, setTimeLeft] = useState<number | null>(null); // in seconds
 
   const formatTime = (time: number) => {
     if (isNaN(time) || time === 0) return "0:00";
@@ -81,6 +84,42 @@ export default function AudioPlayer({
       audioRef.current.volume = isMuted ? 0 : volume / 100;
     }
   }, [volume, isMuted]);
+
+  // Speed
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.playbackRate = playbackSpeed;
+    }
+  }, [playbackSpeed]);
+
+  // Sleep Timer logic
+  useEffect(() => {
+    let interval: any;
+    if (timeLeft !== null && timeLeft > 0 && isPlaying) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => {
+          if (prev !== null && prev <= 1) {
+            audioRef.current?.pause();
+            setIsPlaying(false);
+            setSleepTimer(null);
+            return 0;
+          }
+          return prev ? prev - 1 : 0;
+        });
+      }, 1000);
+    } else {
+      clearInterval(interval);
+    }
+    return () => clearInterval(interval);
+  }, [timeLeft, isPlaying]);
+
+  const toggleSleepTimer = () => {
+    const options = [null, 15, 30, 45, 60];
+    const currentIndex = options.indexOf(sleepTimer);
+    const nextValue = options[(currentIndex + 1) % options.length];
+    setSleepTimer(nextValue);
+    setTimeLeft(nextValue ? nextValue * 60 : null);
+  };
 
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
@@ -204,6 +243,30 @@ export default function AudioPlayer({
               <SkipForward size={20} fill="currentColor" />
             </button>
             <button 
+              className={`ctrl-btn small sleep-timer-btn ${sleepTimer ? 'active' : ''}`}
+              onClick={toggleSleepTimer}
+              title={sleepTimer ? `Minuteur : ${Math.ceil(timeLeft! / 60)}m restants` : "Minuteur de veille"}
+            >
+              <Clock size={16} className={sleepTimer ? 'pulse-icon' : ''} />
+              {sleepTimer && (
+                <div className="timer-display">
+                  <span>{Math.ceil(timeLeft! / 60)}</span>
+                  <span className="unit">m</span>
+                </div>
+              )}
+            </button>
+            <button 
+              className={`ctrl-btn small ${playbackSpeed !== 1 ? 'active' : ''}`}
+              onClick={() => {
+                const speeds = [1, 1.25, 1.5, 2, 0.75];
+                const nextIndex = (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
+                setPlaybackSpeed(speeds[nextIndex]);
+              }}
+              title="Vitesse de lecture"
+            >
+              <span style={{ fontSize: '10px', fontWeight: 'bold' }}>{playbackSpeed}x</span>
+            </button>
+            <button 
               className={`ctrl-btn small ${isRepeat ? 'active' : ''}`}
               onClick={() => setIsRepeat(!isRepeat)}
               title="Répéter"
@@ -267,6 +330,28 @@ export default function AudioPlayer({
                 onClick={() => setIsRepeat(!isRepeat)}
               >
                 <Repeat size={18} />
+              </button>
+              <button 
+                className={`ctrl-btn small ${playbackSpeed !== 1 ? 'active' : ''}`}
+                onClick={() => {
+                  const speeds = [1, 1.25, 1.5, 2, 0.75];
+                  const nextIndex = (speeds.indexOf(playbackSpeed) + 1) % speeds.length;
+                  setPlaybackSpeed(speeds[nextIndex]);
+                }}
+              >
+                <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{playbackSpeed}x</span>
+              </button>
+              <button 
+                className={`ctrl-btn small sleep-timer-btn ${sleepTimer ? 'active' : ''}`}
+                onClick={toggleSleepTimer}
+              >
+                <Clock size={18} className={sleepTimer ? 'pulse-icon' : ''} />
+                {sleepTimer && (
+                  <div className="timer-display mobile">
+                    <span>{Math.ceil(timeLeft! / 60)}</span>
+                    <span className="unit">m</span>
+                  </div>
+                )}
               </button>
               <div className="mobile-volume">
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
@@ -468,6 +553,7 @@ export default function AudioPlayer({
           color: var(--text-secondary);
           transition: all 0.2s;
           flex-shrink: 0;
+          position: relative; /* Added for badge positioning */
         }
 
         .ctrl-btn:hover {
@@ -504,6 +590,52 @@ export default function AudioPlayer({
 
         .play-main:active {
           transform: scale(0.95);
+        }
+
+        .sleep-timer-btn.active {
+          background: rgba(56, 189, 248, 0.15);
+          border: 1px solid rgba(56, 189, 248, 0.3);
+          color: var(--accent-blue);
+          box-shadow: 0 0 15px rgba(56, 189, 248, 0.15);
+        }
+
+        .timer-display {
+          position: absolute;
+          top: -10px;
+          right: -8px;
+          background: var(--accent-blue);
+          color: #020617;
+          font-size: 10px;
+          font-weight: 800;
+          padding: 2px 6px;
+          border-radius: 8px;
+          display: flex;
+          align-items: baseline;
+          gap: 1px;
+          border: 2px solid #0f172a;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+          z-index: 5;
+          animation: badgeIn 0.3s cubic-bezier(0.17, 0.67, 0.83, 0.67);
+        }
+
+        .timer-display .unit {
+          font-size: 7px;
+          opacity: 0.8;
+        }
+
+        .pulse-icon {
+          animation: timerPulse 2s infinite;
+        }
+
+        @keyframes timerPulse {
+          0% { opacity: 1; }
+          50% { opacity: 0.6; }
+          100% { opacity: 1; }
+        }
+
+        @keyframes badgeIn {
+          0% { transform: scale(0.5); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
         }
 
         /* Right */
