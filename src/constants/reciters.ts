@@ -232,7 +232,7 @@ export const POPULAR_RECITERS: Reciter[] = [
         slug: "abdellah-basfer",
         name: "Abdellah Basfer",
         style: "Murattal",
-        image: "/reciters/Basferr.png",
+        image: "/reciters/basfer.png",
         color: "from-slate-600 to-slate-800",
         server: "https://server6.mp3quran.net/bsfr/"
     },
