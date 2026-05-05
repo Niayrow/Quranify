@@ -101,6 +101,49 @@ export default function AudioPlayer({
     }
   }, [playbackSpeed]);
 
+  // Media Session API (Lockscreen Controls & Notifications)
+  useEffect(() => {
+    if ('mediaSession' in navigator && audioUrl) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: surahName,
+        artist: reciterName,
+        album: 'Quranify',
+        artwork: [
+          { src: reciterImage || '/icon-512.png', sizes: '512x512', type: 'image/png' }
+        ]
+      });
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        audioRef.current?.play();
+        setIsPlaying(true);
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        audioRef.current?.pause();
+        setIsPlaying(false);
+      });
+      if (onPrevious) {
+        navigator.mediaSession.setActionHandler('previoustrack', () => onPrevious());
+      }
+      if (onNext) {
+        navigator.mediaSession.setActionHandler('nexttrack', () => onNext());
+      }
+      
+      return () => {
+        navigator.mediaSession.setActionHandler('play', null);
+        navigator.mediaSession.setActionHandler('pause', null);
+        navigator.mediaSession.setActionHandler('previoustrack', null);
+        navigator.mediaSession.setActionHandler('nexttrack', null);
+      };
+    }
+  }, [audioUrl, surahName, reciterName, reciterImage, onNext, onPrevious]);
+
+  // Sync playback state with Media Session
+  useEffect(() => {
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
+    }
+  }, [isPlaying]);
+
   // Sleep Timer logic
   useEffect(() => {
     let interval: any;

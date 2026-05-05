@@ -13,6 +13,8 @@ import { Search, Music2, Users, BookOpen, X, Mic, ChevronRight, Heart, Play, Shu
 
 
 
+
+
 import { POPULAR_RECITERS } from "@/constants/reciters";
 
 export default function Home() {
@@ -68,6 +70,9 @@ export default function Home() {
   // Offline/Download State
   const [isOnline, setIsOnline] = useState(true);
   const [downloadedIds, setDownloadedIds] = useState<number[]>([]);
+
+
+
 
 
 
@@ -613,6 +618,7 @@ export default function Home() {
             <span className="hidden sm:inline">Favoris</span>
           </button>
 
+
           <button 
             className="header-action-btn"
             onClick={() => setIsStatsOpen(true)}
@@ -781,7 +787,23 @@ export default function Home() {
         </div>
       )}
 
+      {/* Footer / Credits */}
+      <footer className="app-footer">
+        <div className="footer-content">
+          <p className="footer-line">
+            Audio: <a href="https://mp3quran.net" target="_blank" rel="noopener noreferrer">mp3quran.net</a> | 
+            (C) <a href="http://versebyversequran.com" target="_blank" rel="noopener noreferrer">VerseByVerseQuran.com</a> | 
+            <a href="http://versebyversequran.com/site/license" target="_blank" rel="noopener noreferrer">Full License</a>
+          </p>
+          <p className="footer-author">
+            Créé avec ❤️ par <a href="https://sofianeweb.fr" target="_blank" rel="noopener noreferrer">sofianeweb.fr</a>
+          </p>
+
+        </div>
+      </footer>
+
       {/* Player */}
+
       <AudioPlayer 
         audioUrl={audioUrl} 
         surahName={selectedSurah?.name_simple || ""}
@@ -818,6 +840,9 @@ export default function Home() {
           </div>
         </div>
       )}
+
+
+
 
 
 
@@ -1663,6 +1688,105 @@ export default function Home() {
             font-size: 1.25rem;
           }
         }
+
+        /* Footer */
+        .app-footer {
+          margin-top: 4rem;
+          padding: 3rem 1.5rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.05);
+          background: rgba(15, 23, 42, 0.2);
+          border-radius: 2rem 2rem 0 0;
+        }
+
+        .footer-content {
+          max-width: 800px;
+          margin: 0 auto;
+          display: flex;
+          flex-direction: column;
+          gap: 0.75rem;
+          text-align: center;
+        }
+
+        .footer-line {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          opacity: 0.6;
+        }
+
+        .footer-author {
+          font-size: 0.85rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          flex-wrap: wrap;
+        }
+
+        .app-footer a {
+
+          color: var(--text-primary);
+          text-decoration: none;
+          border-bottom: 1px solid rgba(56, 189, 248, 0.3);
+          transition: all 0.2s;
+        }
+
+        .app-footer a:hover {
+          color: var(--accent-blue);
+          border-color: var(--accent-blue);
+        }
+
+        .footer-credits {
+          padding: 1.5rem;
+          background: rgba(2, 6, 23, 0.4);
+          border-radius: 1rem;
+          border: 1px solid rgba(255, 255, 255, 0.03);
+        }
+
+        .disclaimer-title {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #f87171;
+          margin-bottom: 0.75rem;
+          text-transform: uppercase;
+        }
+
+        .disclaimer-text {
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          line-height: 1.6;
+          margin-bottom: 0.75rem;
+        }
+
+        .disclaimer-note {
+          font-size: 0.7rem;
+          color: var(--text-secondary);
+          opacity: 0.5;
+          font-style: italic;
+          line-height: 1.4;
+        }
+
+        .footer-bottom {
+          text-align: center;
+          padding-top: 1rem;
+          border-top: 1px solid rgba(255, 255, 255, 0.03);
+          font-size: 0.75rem;
+          color: var(--text-secondary);
+          opacity: 0.6;
+        }
+
+        @media (max-width: 640px) {
+          .app-footer {
+            padding: 2rem 1rem;
+            margin-bottom: 5rem; /* Space for player */
+          }
+          .footer-main {
+            grid-template-columns: 1fr;
+            gap: 1.5rem;
+          }
+        }
+
       `}</style>
     </main>
   );

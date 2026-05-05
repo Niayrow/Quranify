@@ -263,15 +263,6 @@ export const POPULAR_RECITERS: Reciter[] = [
         color: "from-indigo-500 to-purple-700",
         server: "https://server10.mp3quran.net/bader/Rewayat-Hafs-A-n-Assem/"
     },
-    {
-        id: 85,
-        slug: "muhammad-jibreel",
-        name: "Muhammad Jibreel",
-        style: "Murattal",
-        image: "/reciters/jibreel.png",
-        color: "from-stone-500 to-stone-700",
-        server: "https://server8.mp3quran.net/jbrl/"
-    },
 ];
 
 export const SPECIAL_RECITERS = [];

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { X, ChevronLeft, ChevronRight, Play, Pause, Repeat } from "lucide-react";
+
 import { Surah, Reciter } from "@/types/quran";
 
 interface Verse {
@@ -32,6 +33,7 @@ interface SurahReaderProps {
     loopVerseNum?: number | null;
 }
 
+
 export default function SurahReader({ 
     surah, 
     reciter, 
@@ -41,8 +43,9 @@ export default function SurahReader({
     onClose, 
     isLoopingVerse, 
     onToggleLoop, 
-    loopVerseNum 
+    loopVerseNum,
 }: SurahReaderProps) {
+
     const [verses, setVerses] = useState<Verse[]>([]);
     const [timestamps, setTimestamps] = useState<Timestamp[]>([]);
     const [activeVerseNum, setActiveVerseNum] = useState<number>(-1);
@@ -172,15 +175,17 @@ export default function SurahReader({
         <div className="surah-reader">
             <div className="reader-header-sticky">
                 <div className="header-main-row">
-                    <div className="reader-info">
-                        <div className="title-group">
-                            <h2>{surah.name_simple}</h2>
-                            <span className="reciter-mini">Récité par {reciter?.name}</span>
-                        </div>
+                    <div className="title-group">
+                        <h2>{surah.name_simple}</h2>
+                        <span className="reciter-mini">Récité par {reciter?.name}</span>
                     </div>
-                    <button className="close-reader" onClick={onClose}>
-                        <X size={22} />
-                    </button>
+                    <div className="header-actions-mini">
+                        <button className="close-reader" onClick={onClose}>
+                            <X size={22} />
+                        </button>
+                    </div>
+
+
                 </div>
                 
                 <div className="reader-controls-row">
@@ -242,7 +247,18 @@ export default function SurahReader({
                                         <div className="verse-actions">
                                             {isLooping && <div className="loop-badge"><Repeat size={10} /><span>Boucle #{repeatCount}</span></div>}
                                             {isActive && isPlaying && <div className="playing-dot" />}
+                                            <button 
+                                                className={`verse-loop-btn ${isLooping ? 'active' : ''}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onToggleLoop?.(verse.numberInSurah);
+                                                }}
+                                                title="Boucle sur ce verset"
+                                            >
+                                                <Repeat size={14} />
+                                            </button>
                                         </div>
+
                                     </div>
                                     {showArabic && <p className="verse-arabic" dir="rtl">{verse.text}</p>}
                                     {showPhonetic && <p className="verse-phonetic">{verse.transliteration}</p>}
@@ -290,7 +306,14 @@ export default function SurahReader({
                     width: 100%;
                 }
 
+                .header-actions-mini {
+                    display: flex;
+                    align-items: center;
+                    gap: 1rem;
+                }
+
                 .reader-info {
+
                     display: flex;
                     align-items: center;
                     gap: 1.25rem;
@@ -520,6 +543,31 @@ export default function SurahReader({
                     border-radius: 50%;
                     box-shadow: 0 0 10px #38bdf8;
                     animation: pulse 1.5s infinite;
+                }
+
+                .verse-loop-btn {
+                    background: none;
+                    border: none;
+                    color: rgba(148, 163, 184, 0.4);
+                    cursor: pointer;
+                    transition: all 0.2s;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 6px;
+                    border-radius: 50%;
+                }
+
+                .verse-loop-btn:hover {
+                    color: var(--accent-blue);
+                    background: rgba(56, 189, 248, 0.1);
+                    transform: scale(1.1);
+                }
+
+                .verse-loop-btn.active {
+                    color: var(--accent-blue);
+                    background: rgba(56, 189, 248, 0.15);
+                    box-shadow: 0 0 10px rgba(56, 189, 248, 0.2);
                 }
 
                 @keyframes pulse {
