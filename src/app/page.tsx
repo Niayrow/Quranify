@@ -6,7 +6,13 @@ import SurahCard from "@/components/SurahCard";
 import AudioPlayer from "@/components/AudioPlayer";
 import ReciterSelect from "@/components/ReciterSelect";
 import SurahReader from "@/components/SurahReader";
-import { Search, Music2, Users, BookOpen, X, Mic, ChevronRight, Heart, Play, Shuffle, Volume2, MicOff } from "lucide-react";
+import RadioMode from "@/components/RadioMode";
+import DynamicBackground, { ThemeType } from "@/components/DynamicBackground";
+import StatsModal from "@/components/StatsModal";
+import { Search, Music2, Users, BookOpen, X, Mic, ChevronRight, Heart, Play, Shuffle, Volume2, MicOff, Radio, Palette, Activity } from "lucide-react";
+
+
+
 import { POPULAR_RECITERS } from "@/constants/reciters";
 
 export default function Home() {
@@ -27,12 +33,43 @@ export default function Home() {
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [lastSession, setLastSession] = useState<{ surahId: number, reciterId: number, time: number } | null>(null);
   const [isLoopingVerse, setIsLoopingVerse] = useState(false);
+
+  // Stats State
+  const [listeningStats, setListeningStats] = useState({ total: 0, today: 0 });
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+
+  // Radio Settings
+  const [radioReciterIds, setRadioReciterIds] = useState<number[]>([]);
+  const [radioScope, setRadioScope] = useState<'all' | 'juz_amma'>('all');
+
+  // History State
+  const [history, setHistory] = useState<{ surahId: number, reciterId: number }[]>([]);
+
+
+
+
   const [loopVerseNum, setLoopVerseNum] = useState<number | null>(null);
 
   // Voice Search State
   const [isListening, setIsListening] = useState(false);
   const [voiceTranscript, setVoiceTranscript] = useState("");
   const [voiceFeedback, setVoiceFeedback] = useState<string | null>(null);
+
+  // Radio State
+  const [isRadioMode, setIsRadioMode] = useState(false);
+
+  // Theme State
+  const [theme, setTheme] = useState<ThemeType>("classic");
+
+  // PWA Install State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBtn, setShowInstallBtn] = useState(false);
+
+  // Offline/Download State
+  const [isOnline, setIsOnline] = useState(true);
+  const [downloadedIds, setDownloadedIds] = useState<number[]>([]);
+
+
 
   useEffect(() => {
     fetch("https://api.quran.com/api/v4/chapters?language=fr")
@@ -61,29 +98,117 @@ export default function Home() {
       const reciter = reciters.find(r => r.id === parseInt(savedReciterId));
       if (reciter) setSelectedReciter(reciter);
     }
+
+    // Load saved theme
+    const savedTheme = localStorage.getItem("quranify_theme") as ThemeType;
+    if (savedTheme) setTheme(savedTheme);
+
+    // Load listening stats
+    const totalSec = parseInt(localStorage.getItem("quranify_total_sec") || "0");
+    const todayKey = new Date().toISOString().split('T')[0];
+    const todaySec = parseInt(localStorage.getItem(`quranify_stats_${todayKey}`) || "0");
+    setListeningStats({ total: totalSec, today: todaySec });
+
+    // Load radio reciters
+    const savedRadioReciters = localStorage.getItem("quranify_radio_reciters");
+    if (savedRadioReciters) {
+      try { setRadioReciterIds(JSON.parse(savedRadioReciters)); } catch (e) {}
+    } else {
+      setRadioReciterIds(POPULAR_RECITERS.map(r => r.id));
+    }
+
+    const savedScope = localStorage.getItem("quranify_radio_scope") as 'all' | 'juz_amma';
+    if (savedScope) setRadioScope(savedScope);
+
+    // Load history
+    const savedHistory = localStorage.getItem("quranify_history");
+    if (savedHistory) {
+      try { setHistory(JSON.parse(savedHistory)); } catch (e) {}
+    }
+
+    // Register SW with forced update
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then((reg) => {
+        reg.update(); // Force check for new SW version
+      }).catch(() => {});
+    }
+
+
+    // Handle PWA Install
+    window.addEventListener('beforeinstallprompt', (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBtn(true);
+    });
+
+    window.addEventListener('appinstalled', () => {
+      setShowInstallBtn(false);
+      setDeferredPrompt(null);
+    });
+
+    // Handle Online/Offline
+    setIsOnline(navigator.onLine);
+    window.addEventListener('online', () => setIsOnline(true));
+    window.addEventListener('offline', () => setIsOnline(false));
+
+    // Load downloads metadata
+    const savedDownloads = localStorage.getItem("quranify_downloads");
+    if (savedDownloads) {
+      try { setDownloadedIds(JSON.parse(savedDownloads)); } catch (e) {}
+    }
   }, []);
+
+
+
+
+
+
+
 
   useEffect(() => {
     const filtered = surahs.filter(
       (s) => {
+        // If offline, only show downloaded
+        if (!isOnline && !downloadedIds.includes(s.id)) return false;
+
         const matchesSearch = s.name_simple.toLowerCase().includes(search.toLowerCase()) ||
-          s.translated_name.name.toLowerCase().includes(search.toLowerCase()) ||
           s.id.toString() === search;
-        
-        if (showOnlyFavorites) {
-          return matchesSearch && favorites.includes(s.id);
-        }
-        return matchesSearch;
+        const matchesFavorite = showOnlyFavorites ? favorites.includes(s.id) : true;
+        return matchesSearch && matchesFavorite;
       }
     );
     setFilteredSurahs(filtered);
-  }, [search, surahs, showOnlyFavorites, favorites]);
+  }, [search, surahs, favorites, showOnlyFavorites, isOnline, downloadedIds]);
 
   useEffect(() => {
     if (selectedSurah && selectedReciter) {
       updateAudio(selectedSurah, selectedReciter);
     }
   }, [selectedSurah, selectedReciter]);
+
+  // Listening Time Tracker
+  useEffect(() => {
+    let interval: any;
+    if (isPlaying) {
+      interval = setInterval(() => {
+        setListeningStats(prev => {
+          const newToday = prev.today + 1;
+          const newTotal = prev.total + 1;
+          
+          // Save periodically to localStorage every 10 seconds
+          if (newToday % 10 === 0) {
+            const todayKey = new Date().toISOString().split('T')[0];
+            localStorage.setItem("quranify_total_sec", newTotal.toString());
+            localStorage.setItem(`quranify_stats_${todayKey}`, newToday.toString());
+          }
+          
+          return { total: newTotal, today: newToday };
+        });
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying]);
+
 
   const updateAudio = (surah: Surah, reciter: Reciter) => {
     const paddedId = surah.id.toString().padStart(3, "0");
@@ -105,17 +230,82 @@ export default function Home() {
       }
     } else {
       setSelectedSurah(surah);
-      setIsReaderOpen(true);
+      
+      // Update history
+      setHistory(prev => {
+        const newItem = { surahId: surah.id, reciterId: selectedReciter.id };
+        // Remove duplicate if exists
+        const filtered = prev.filter(item => !(item.surahId === surah.id && item.reciterId === selectedReciter.id));
+        const newHistory = [newItem, ...filtered].slice(0, 10); // Keep last 10
+        localStorage.setItem("quranify_history", JSON.stringify(newHistory));
+        return newHistory;
+      });
     }
   };
 
+
   const handleNext = () => {
+    if (isRadioMode) {
+      handleRadioNext();
+      return;
+    }
     if (!selectedSurah) return;
     const currentIndex = surahs.findIndex((s) => s.id === selectedSurah.id);
     if (currentIndex < surahs.length - 1) {
       handleSelectSurah(surahs[currentIndex + 1]);
     }
   };
+
+  const handleRadioNext = () => {
+    if (surahs.length === 0) return;
+    
+    // Pick from allowed reciters
+    const allowedReciters = reciters.filter(r => radioReciterIds.includes(r.id));
+    const pool = allowedReciters.length > 0 ? allowedReciters : reciters;
+    
+    const randomReciterIndex = Math.floor(Math.random() * pool.length);
+    setSelectedReciter(pool[randomReciterIndex]);
+
+    // Respect the selected scope
+    let targetSurahs = radioScope === 'juz_amma' ? surahs.filter(s => s.id >= 78) : surahs;
+    
+    // Fallback just in case
+    if (targetSurahs.length === 0) targetSurahs = surahs;
+
+    const randomSurahIndex = Math.floor(Math.random() * targetSurahs.length);
+    handleSelectSurah(targetSurahs[randomSurahIndex]);
+  };
+
+
+  const toggleRadioReciter = (id: number) => {
+    setRadioReciterIds(prev => {
+      const newVal = prev.includes(id) 
+        ? prev.filter(rid => rid !== id) 
+        : [...prev, id];
+      localStorage.setItem("quranify_radio_reciters", JSON.stringify(newVal));
+      return newVal;
+    });
+  };
+
+  const handleSetRadioScope = (scope: 'all' | 'juz_amma') => {
+    setRadioScope(scope);
+    localStorage.setItem("quranify_radio_scope", scope);
+  };
+
+  const handleSelectAllRadio = () => {
+
+    const allIds = reciters.map(r => r.id);
+    setRadioReciterIds(allIds);
+    localStorage.setItem("quranify_radio_reciters", JSON.stringify(allIds));
+  };
+
+  const handleDeselectAllRadio = () => {
+    setRadioReciterIds([]);
+    localStorage.setItem("quranify_radio_reciters", JSON.stringify([]));
+  };
+
+
+
 
   const handlePrevious = () => {
     if (!selectedSurah) return;
@@ -278,72 +468,177 @@ export default function Home() {
     setTimeout(() => setVoiceFeedback(null), 4000);
   };
 
+  const cycleTheme = () => {
+    const themes: ThemeType[] = ["classic", "starry", "desert", "mist"];
+    const currentIndex = themes.indexOf(theme);
+    const nextTheme = themes[(currentIndex + 1) % themes.length];
+    setTheme(nextTheme);
+    localStorage.setItem("quranify_theme", nextTheme);
+  };
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setShowInstallBtn(false);
+      setDeferredPrompt(null);
+    }
+  };
+
+  const handleDownloadSurah = async (surahId: number) => {
+    try {
+      const url = `${selectedReciter.server}${surahId.toString().padStart(3, '0')}.mp3`;
+      const cache = await caches.open('quranify-audio');
+      
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      
+      await cache.put(url, response);
+      
+      setDownloadedIds(prev => {
+        if (prev.includes(surahId)) return prev;
+        const next = [...prev, surahId];
+        localStorage.setItem("quranify_downloads", JSON.stringify(next));
+        return next;
+      });
+    } catch (e) {
+      console.error("Download failed", e);
+      alert("Erreur lors du téléchargement. Veuillez vérifier votre connexion.");
+    }
+  };
+
+
+
   return (
     <main className="app-container">
+      <DynamicBackground theme={theme} />
       {/* Header */}
       <header className="header">
-        <div className="logo">
-          <div className="logo-icon">
-            <img src="/logo.png" alt="Quranify Logo" className="logo-img" />
+        <div className="header-top">
+          <div className="logo-group">
+            <div className="logo">
+              <h1>Quranify</h1>
+            </div>
+            {showInstallBtn && (
+              <button className="install-btn" onClick={handleInstallClick}>
+                Installer l'app
+              </button>
+            )}
           </div>
-          <h1>Quranify</h1>
-        </div>
-        
-        <div className="search-wrap">
-          <Search size={18} />
-          <input 
-            type="text" 
-            placeholder="Sourate, nom ou numéro..." 
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-          <button 
-            className={`voice-search-btn ${isListening ? 'active' : ''}`}
-            onClick={startVoiceSearch}
-            title="Recherche vocale"
-          >
-            <Mic size={18} />
-          </button>
-          {search && (
-            <button className="clear-search" onClick={() => setSearch("")}>
-              <X size={16} />
+
+          
+          <div className="search-wrap">
+            <Search size={18} />
+            <input 
+              type="text" 
+              placeholder={isOnline ? "Sourate, nom ou numéro..." : "Recherche hors ligne..."}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+            {!isOnline && (
+              <div className="offline-badge" title="Vous êtes hors ligne">
+                MODE HORS LIGNE
+              </div>
+            )}
+            <button 
+              className={`voice-search-btn ${isListening ? 'active' : ''}`}
+              onClick={startVoiceSearch}
+              title="Recherche vocale"
+            >
+              <Mic size={18} />
             </button>
-          )}
+            {search && (
+              <button className="clear-search" onClick={() => setSearch("")}>
+                <X size={16} />
+              </button>
+            )}
+          </div>
         </div>
 
-        <button 
-          className="header-action-btn"
-          onClick={handleRandom}
-          title="Sourate aléatoire"
-        >
-          <Shuffle size={18} />
-          <span>Hasard</span>
-        </button>
-
-        <button 
-          className={`fav-toggle-btn ${showOnlyFavorites ? 'active' : ''}`}
-          onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
-          title={showOnlyFavorites ? "Voir tout" : "Voir mes favoris"}
-        >
-          <Heart size={18} fill={showOnlyFavorites ? "currentColor" : "none"} />
-          <span>Favoris</span>
-        </button>
-
-        <div className="view-toggle-wrap">
+        <div className="header-actions">
           <button 
-            className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
-            onClick={() => setViewMode('grid')}
-            title="Grille"
+            className={`header-action-btn ${isRadioMode ? 'active-radio' : ''}`}
+            onClick={() => {
+              if (!isRadioMode) {
+                if (!isPlaying && surahs.length > 0) {
+                  handleRadioNext(); // Start immediately if not playing
+                }
+                if (document.documentElement.requestFullscreen) {
+                  document.documentElement.requestFullscreen().catch(() => {});
+                }
+                setIsRadioMode(true);
+              } else {
+                if (document.fullscreenElement) {
+                  document.exitFullscreen().catch(() => {});
+                }
+                setIsRadioMode(false);
+              }
+            }}
+            title="Mode Radio Coran"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            <Radio size={18} className={isRadioMode ? "radio-icon-anim" : ""} />
+            <span className="hidden sm:inline">Radio</span>
           </button>
+
           <button 
-            className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
-            onClick={() => setViewMode('list')}
-            title="Liste compacte"
+            className="header-action-btn"
+            onClick={cycleTheme}
+            title="Changer de thème atmosphérique"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            <Palette size={18} />
+            <span className="hidden sm:inline">
+              {theme === 'classic' && 'Classique'}
+              {theme === 'starry' && 'Nuit'}
+              {theme === 'desert' && 'Désert'}
+              {theme === 'mist' && 'Brume'}
+            </span>
           </button>
+
+          <button 
+            className="header-action-btn"
+            onClick={handleRandom}
+            title="Sourate aléatoire"
+          >
+            <Shuffle size={18} />
+            <span className="hidden sm:inline">Hasard</span>
+          </button>
+
+          <button 
+            className={`fav-toggle-btn ${showOnlyFavorites ? 'active' : ''}`}
+            onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+            title={showOnlyFavorites ? "Voir tout" : "Voir mes favoris"}
+          >
+            <Heart size={18} fill={showOnlyFavorites ? "currentColor" : "none"} />
+            <span className="hidden sm:inline">Favoris</span>
+          </button>
+
+          <button 
+            className="header-action-btn"
+            onClick={() => setIsStatsOpen(true)}
+            title="Statistiques d'écoute"
+          >
+            <Activity size={18} />
+            <span className="hidden sm:inline">Activité</span>
+          </button>
+
+          <div className="view-toggle-wrap">
+
+            <button 
+              className={`view-btn ${viewMode === 'grid' ? 'active' : ''}`}
+              onClick={() => setViewMode('grid')}
+              title="Grille"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+            </button>
+            <button 
+              className={`view-btn ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="Liste compacte"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -388,6 +683,47 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Listening History */}
+      {!showOnlyFavorites && !search && history.length > 0 && (
+        <section className="history-section">
+          <div className="history-header">
+            <h3>Récemment écouté</h3>
+            <button className="history-clear" onClick={() => { setHistory([]); localStorage.removeItem("quranify_history"); }}>
+              Effacer
+            </button>
+          </div>
+          <div className="history-scroll">
+            {history.map((item, idx) => {
+              const s = surahs.find(surah => surah.id === item.surahId);
+              const r = reciters.find(reciter => reciter.id === item.reciterId);
+              if (!s || !r) return null;
+              
+              return (
+                <div 
+                  key={`${item.surahId}-${item.reciterId}-${idx}`} 
+                  className="history-card" 
+                  onClick={() => {
+                    setSelectedReciter(r);
+                    handleSelectSurah(s);
+                  }}
+                >
+                   <div className="history-avatar">
+                     {r.image ? <img src={r.image} alt="" /> : <Mic size={14} />}
+                     <div className="history-play-overlay">
+                       <Play size={14} fill="currentColor" />
+                     </div>
+                   </div>
+                   <div className="history-info">
+                     <span className="h-surah">{s.name_simple}</span>
+                     <span className="h-reciter">{r.name.split(' ').pop()}</span>
+                   </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Resume Banner */}
       {lastSession && !selectedSurah && (
         <div className="resume-banner" onClick={handleResume}>
@@ -429,7 +765,11 @@ export default function Home() {
               isFavorite={favorites.includes(surah.id)}
               onToggleFavorite={toggleFavorite}
               compact={viewMode === 'list'}
+              isDownloaded={downloadedIds.includes(surah.id)}
+              onDownload={handleDownloadSurah}
+              isOnline={isOnline}
             />
+
           ))}
           {showOnlyFavorites && filteredSurahs.length === 0 && (
             <div className="empty-favs">
@@ -491,7 +831,51 @@ export default function Home() {
       />
 
 
+      {/* Radio Overlay */}
+      {isRadioMode && (
+        <RadioMode 
+          surah={selectedSurah}
+          reciter={selectedReciter}
+          isPlaying={isPlaying}
+          onClose={() => {
+            if (document.fullscreenElement) {
+              document.exitFullscreen().catch(() => {});
+            }
+            setIsRadioMode(false);
+          }}
+          onNext={handleRadioNext}
+          onTogglePlay={() => {
+            if (playerAudioRef.current) {
+              if (isPlaying) playerAudioRef.current.pause();
+              else playerAudioRef.current.play().catch(() => {});
+            } else if (!selectedSurah) {
+              handleRadioNext();
+            }
+          }}
+          allReciters={reciters}
+          selectedReciterIds={radioReciterIds}
+          onToggleReciter={toggleRadioReciter}
+          onSelectAll={handleSelectAllRadio}
+          onDeselectAll={handleDeselectAllRadio}
+          radioScope={radioScope}
+          onSetRadioScope={handleSetRadioScope}
+        />
+
+
+
+      )}
+
+      {/* Stats Modal */}
+      {isStatsOpen && (
+        <StatsModal 
+          totalSeconds={listeningStats.total}
+          todaySeconds={listeningStats.today}
+          onClose={() => setIsStatsOpen(false)}
+        />
+      )}
+
       {/* Voice Search Overlay */}
+
       {isListening && (
         <div className="voice-overlay">
           <div className="voice-content">
@@ -521,10 +905,55 @@ export default function Home() {
         /* Header */
         .header {
           display: flex;
+          flex-direction: column;
+          gap: 1rem;
+          margin-bottom: 1.5rem;
+        }
+
+        .header-top {
+          display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 1.5rem;
-          margin-bottom: 1rem;
+          width: 100%;
+        }
+
+        .logo-group {
+          display: flex;
+          align-items: center;
+          gap: 1rem;
+        }
+
+        .install-btn {
+          background: var(--accent-blue);
+          color: #020617;
+          border: none;
+          padding: 0.4rem 1rem;
+          border-radius: 2rem;
+          font-size: 0.75rem;
+          font-weight: 800;
+          cursor: pointer;
+          transition: all 0.3s;
+          box-shadow: 0 4px 15px var(--accent-blue-glow);
+          animation: bounceIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .install-btn:hover {
+          transform: translateY(-2px) scale(1.05);
+          box-shadow: 0 6px 20px var(--accent-blue-glow);
+        }
+
+        @keyframes bounceIn {
+          from { transform: scale(0); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+
+        .header-actions {
+
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          flex-wrap: wrap;
         }
 
         .logo {
@@ -534,21 +963,18 @@ export default function Home() {
         }
 
         .logo-icon {
-          width: 40px;
-          height: 40px;
-          border-radius: 12px;
-          background: linear-gradient(135deg, var(--accent-blue), #818cf8);
+          width: 48px;
+          height: 48px;
           display: flex;
           align-items: center;
           justify-content: center;
-          color: white;
-          overflow: hidden; /* Added to clip logo image */
+          transition: all 0.3s ease;
         }
 
         .logo-img {
           width: 100%;
           height: 100%;
-          object-fit: cover;
+          object-fit: contain;
         }
 
         .logo h1 {
@@ -675,8 +1101,8 @@ export default function Home() {
           backdrop-filter: blur(8px);
           border: 1px solid rgba(255, 255, 255, 0.07);
           border-radius: 0.85rem;
-          width: 100%;
-          max-width: 340px;
+          flex: 1;
+          max-width: 400px;
           color: var(--text-secondary);
           transition: all 0.2s;
         }
@@ -700,7 +1126,26 @@ export default function Home() {
           opacity: 0.6;
         }
 
+        .offline-badge {
+          background: #ef4444;
+          color: white;
+          font-size: 0.6rem;
+          font-weight: 900;
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          letter-spacing: 1px;
+          animation: pulse-red 2s infinite;
+          white-space: nowrap;
+        }
+
+        @keyframes pulse-red {
+          0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+          70% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+
         .clear-search {
+
           color: var(--text-secondary);
           opacity: 0.6;
           transition: opacity 0.2s;
@@ -735,6 +1180,127 @@ export default function Home() {
           color: var(--accent-blue);
           font-weight: 700;
         }
+
+        /* History Section */
+        .history-section {
+          margin-bottom: 2rem;
+          padding: 0 0.25rem;
+        }
+
+        .history-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1rem;
+        }
+
+        .history-header h3 {
+          font-size: 0.85rem;
+          font-weight: 700;
+          color: var(--text-primary);
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+          opacity: 0.8;
+        }
+
+        .history-clear {
+          background: transparent;
+          border: none;
+          color: var(--text-secondary);
+          font-size: 0.75rem;
+          cursor: pointer;
+          transition: color 0.2s;
+        }
+
+        .history-clear:hover {
+          color: var(--accent-blue);
+        }
+
+        .history-scroll {
+          display: flex;
+          gap: 0.75rem;
+          overflow-x: auto;
+          padding-bottom: 0.5rem;
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+
+        .history-scroll::-webkit-scrollbar {
+          display: none;
+        }
+
+        .history-card {
+          flex: 0 0 auto;
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+          padding: 0.5rem 1rem 0.5rem 0.6rem;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          border-radius: 1rem;
+          cursor: pointer;
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .history-card:hover {
+          background: rgba(56, 189, 248, 0.08);
+          border-color: rgba(56, 189, 248, 0.2);
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .history-avatar {
+          position: relative;
+          width: 32px;
+          height: 32px;
+          border-radius: 50%;
+          overflow: hidden;
+          background: rgba(255, 255, 255, 0.1);
+          flex-shrink: 0;
+          border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .history-avatar img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .history-play-overlay {
+          position: absolute;
+          inset: 0;
+          background: rgba(56, 189, 248, 0.7);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #020617;
+          opacity: 0;
+          transition: opacity 0.2s;
+        }
+
+        .history-card:hover .history-play-overlay {
+          opacity: 1;
+        }
+
+        .history-info {
+          display: flex;
+          flex-direction: column;
+          gap: 1px;
+        }
+
+        .h-surah {
+          font-size: 0.8rem;
+          font-weight: 600;
+          color: var(--text-primary);
+          line-height: 1;
+        }
+
+        .h-reciter {
+          font-size: 0.65rem;
+          color: var(--text-secondary);
+          opacity: 0.8;
+        }
+
 
         /* Resume Banner */
         .resume-banner {
@@ -864,6 +1430,22 @@ export default function Home() {
           background: rgba(56, 189, 248, 0.1);
           color: var(--accent-blue);
           border-color: rgba(56, 189, 248, 0.2);
+        }
+
+        .header-action-btn.active-radio {
+          background: rgba(239, 68, 68, 0.15);
+          color: #ef4444;
+          border-color: rgba(239, 68, 68, 0.3);
+          box-shadow: 0 0 15px rgba(239, 68, 68, 0.2);
+        }
+
+        .radio-icon-anim {
+          animation: pulseRadio 2s infinite;
+        }
+
+        @keyframes pulseRadio {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(0.9); }
         }
 
         .view-btn {
@@ -1061,15 +1643,20 @@ export default function Home() {
           .app-container {
             padding: 1rem 1rem 7rem;
           }
-          .header {
+          .header-top {
             flex-direction: column;
-            align-items: stretch;
+            align-items: center;
             gap: 1rem;
+          }
+          .logo {
+            justify-content: center;
+            width: 100%;
           }
           .search-wrap {
             max-width: 100%;
+            width: 100%;
           }
-          .fav-toggle-btn {
+          .header-actions {
             justify-content: center;
           }
           .logo h1 {

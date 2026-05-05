@@ -171,15 +171,19 @@ export default function SurahReader({
     return (
         <div className="surah-reader">
             <div className="reader-header-sticky">
-                <div className="reader-info">
-                    <img src="/logo.png" alt="" className="reader-logo-mini" />
-                    <div className="title-group">
-                        <h2>{surah.name_simple}</h2>
-                        <span className="reciter-mini">Récité par {reciter?.name}</span>
+                <div className="header-main-row">
+                    <div className="reader-info">
+                        <div className="title-group">
+                            <h2>{surah.name_simple}</h2>
+                            <span className="reciter-mini">Récité par {reciter?.name}</span>
+                        </div>
                     </div>
+                    <button className="close-reader" onClick={onClose}>
+                        <X size={22} />
+                    </button>
                 </div>
                 
-                <div className="reader-controls">
+                <div className="reader-controls-row">
                     <div className="view-toggles">
                         <button 
                             className={`toggle-btn learn ${isLoopingVerse ? 'active' : ''}`} 
@@ -194,11 +198,9 @@ export default function SurahReader({
                         <button className={`toggle-btn ${showPhonetic ? 'active' : ''}`} onClick={() => setShowPhonetic(!showPhonetic)}>PH</button>
                         <button className={`toggle-btn ${showFrench ? 'active' : ''}`} onClick={() => setShowFrench(!showFrench)}>FR</button>
                     </div>
-                    <button className="close-reader" onClick={onClose}>
-                        <X size={24} />
-                    </button>
                 </div>
             </div>
+
 
             <div className="reader-body">
                 {loading ? (
@@ -271,20 +273,28 @@ export default function SurahReader({
                     position: sticky;
                     top: 0;
                     z-index: 50;
-                    background: rgba(2, 6, 23, 0.7);
-                    backdrop-filter: blur(20px);
-                    -webkit-backdrop-filter: blur(20px);
-                    padding: 1rem 2rem;
-                    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+                    background: rgba(2, 6, 23, 0.85);
+                    backdrop-filter: blur(24px);
+                    -webkit-backdrop-filter: blur(24px);
+                    padding: 1.25rem 2rem;
+                    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+                    display: flex;
+                    flex-direction: column;
+                    gap: 1.25rem;
+                }
+
+                .header-main-row {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
+                    width: 100%;
                 }
 
                 .reader-info {
                     display: flex;
                     align-items: center;
                     gap: 1.25rem;
+                    min-width: 0;
                 }
 
                 .reader-logo-mini {
@@ -295,26 +305,39 @@ export default function SurahReader({
                     border: 1px solid rgba(255, 255, 255, 0.1);
                 }
 
+                .title-group {
+                    min-width: 0;
+                }
+
                 .title-group h2 {
-                    font-size: 1.5rem;
+                    font-size: 1.75rem;
                     font-weight: 800;
                     margin: 0;
                     background: linear-gradient(135deg, #38bdf8, #818cf8);
                     -webkit-background-clip: text;
                     -webkit-text-fill-color: transparent;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
                 }
 
                 .reciter-mini {
-                    font-size: 0.75rem;
+                    font-size: 0.8rem;
                     color: #94a3b8;
                     font-weight: 500;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    display: block;
                 }
 
-                .reader-controls {
+                .reader-controls-row {
                     display: flex;
                     align-items: center;
-                    gap: 1.5rem;
+                    justify-content: center;
+                    width: 100%;
                 }
+
 
                 .view-toggles {
                     display: flex;
@@ -537,13 +560,31 @@ export default function SurahReader({
                 }
 
                 @media (max-width: 640px) {
-                    .reader-header-sticky { padding: 1rem; }
-                    .reader-info h2 { font-size: 1.2rem; }
+                    .reader-header-sticky { 
+                        padding: 1rem; 
+                        gap: 0.75rem;
+                    }
+                    .header-main-row h2 { 
+                        font-size: 1.3rem; 
+                    }
+                    .reciter-mini {
+                        font-size: 0.7rem;
+                    }
+                    .view-toggles {
+                        width: 100%;
+                        justify-content: space-between;
+                        padding: 0.25rem 0.5rem;
+                    }
+                    .toggle-btn {
+                        padding: 0.4rem 0.6rem;
+                        font-size: 0.65rem;
+                    }
                     .view-toggles span { display: none; }
-                    .verses-container { padding: 1rem 1rem 10rem; gap: 1.5rem; }
-                    .verse-arabic { font-size: 1.6rem; }
-                    .verse-card { padding: 1.25rem; }
+                    .verses-container { padding: 1.5rem 1rem 12rem; gap: 2rem; }
+                    .verse-arabic { font-size: 1.8rem; line-height: 1.8; }
+                    .verse-card { padding: 1.5rem; border-radius: 1.25rem; }
                 }
+
             `}</style>
         </div>
     );

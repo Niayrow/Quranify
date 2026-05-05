@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useRef, useState, useEffect, useCallback } from "react";
-import { 
-  Play, Pause, SkipBack, SkipForward, 
-  Volume2, VolumeX, Repeat, Shuffle, 
+import {
+  Play, Pause, SkipBack, SkipForward,
+  Volume2, VolumeX, Repeat, Shuffle,
   ChevronDown, BookOpen, Clock
 } from "lucide-react";
 
@@ -22,8 +22,8 @@ interface AudioPlayerProps {
   onOpenReader?: () => void;
 }
 
-export default function AudioPlayer({ 
-  audioUrl, surahName, surahArabic, reciterName, reciterImage, surahNumber, onNext, onPrevious, onPlayStateChange, onTimeUpdate, audioRef: externalAudioRef, onOpenReader 
+export default function AudioPlayer({
+  audioUrl, surahName, surahArabic, reciterName, reciterImage, surahNumber, onNext, onPrevious, onPlayStateChange, onTimeUpdate, audioRef: externalAudioRef, onOpenReader
 }: AudioPlayerProps) {
   const internalAudioRef = useRef<HTMLAudioElement>(null);
   const audioRef = externalAudioRef || internalAudioRef;
@@ -40,6 +40,15 @@ export default function AudioPlayer({
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
   const [sleepTimer, setSleepTimer] = useState<number | null>(null); // in minutes
   const [timeLeft, setTimeLeft] = useState<number | null>(null); // in seconds
+
+  // Visualizer Refs
+  const visualizerCanvasRef = useRef<HTMLCanvasElement>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const isSourceConnected = useRef(false);
+
+
 
   const formatTime = (time: number) => {
     if (isNaN(time) || time === 0) return "0:00";
@@ -73,7 +82,7 @@ export default function AudioPlayer({
   useEffect(() => {
     if (audioUrl && audioRef.current) {
       audioRef.current.load();
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => { });
       setIsPlaying(true);
     }
   }, [audioUrl]);
@@ -121,15 +130,96 @@ export default function AudioPlayer({
     setTimeLeft(nextValue ? nextValue * 60 : null);
   };
 
+  const renderVisualizer = useCallback(() => {
+    if (!analyserRef.current || !visualizerCanvasRef.current) return;
+    const canvas = visualizerCanvasRef.current;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+
+    const draw = () => {
+      if (!analyserRef.current) return;
+      requestAnimationFrame(draw);
+      analyserRef.current.getByteFrequencyData(dataArray);
+
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const barWidth = (canvas.width / bufferLength) * 2;
+      let barHeight;
+      let x = 0;
+
+      for (let i = 0; i < bufferLength; i++) {
+        barHeight = (dataArray[i] / 255) * canvas.height;
+
+        ctx.fillStyle = `rgba(56, 189, 248, ${0.3 + (dataArray[i] / 255) * 0.7})`;
+
+        const radius = 2;
+        const y = canvas.height - barHeight;
+
+        if (barHeight > 2) {
+          ctx.beginPath();
+          ctx.roundRect(x, y, barWidth - 3, barHeight, radius);
+          ctx.fill();
+        }
+
+        x += barWidth;
+      }
+    };
+    draw();
+  }, []);
+
+  const initVisualizer = useCallback(() => {
+    if (!audioRef.current || isSourceConnected.current) {
+      if (audioCtxRef.current?.state === 'suspended') {
+        audioCtxRef.current.resume();
+      }
+      return;
+    }
+
+    try {
+      const AudioContextClass = (window.AudioContext || (window as any).webkitAudioContext);
+      const audioCtx = new AudioContextClass();
+      const analyser = audioCtx.createAnalyser();
+
+      const source = audioCtx.createMediaElementSource(audioRef.current);
+      isSourceConnected.current = true;
+
+      source.connect(analyser);
+      analyser.connect(audioCtx.destination);
+
+      analyser.fftSize = 64;
+      analyserRef.current = analyser;
+      audioCtxRef.current = audioCtx;
+      sourceRef.current = source;
+
+      renderVisualizer();
+    } catch (e) {
+      console.warn("Visualizer init failed", e);
+    }
+  }, [renderVisualizer]);
+
+
+  // Ensure visualizer is ready when playing starts from anywhere
+  useEffect(() => {
+    if (isPlaying) {
+      initVisualizer();
+    }
+  }, [isPlaying, initVisualizer]);
+
   const togglePlay = useCallback(() => {
     if (!audioRef.current) return;
+
     if (isPlaying) {
       audioRef.current.pause();
     } else {
-      audioRef.current.play().catch(() => {});
+      audioRef.current.play().catch(() => { });
     }
     setIsPlaying(!isPlaying);
   }, [isPlaying]);
+
+
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
@@ -162,7 +252,7 @@ export default function AudioPlayer({
     if (isRepeat) {
       if (audioRef.current) {
         audioRef.current.currentTime = 0;
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().catch(() => { });
       }
     } else if (onNext) {
       onNext();
@@ -212,22 +302,30 @@ export default function AudioPlayer({
               )}
             </div>
             <div className="player-info">
-              <div className="player-title">{surahName}</div>
+              <div className="player-title-row">
+                <div className="player-title">{surahName}</div>
+                {isPlaying && (
+                  <div className="player-visualizer">
+                    <canvas ref={visualizerCanvasRef} width="60" height="20" />
+                  </div>
+                )}
+              </div>
               <div className="player-subtitle">{reciterName}</div>
             </div>
           </div>
 
+
           {/* Center: Controls */}
           <div className="player-center">
-            <button 
-              className="reader-trigger" 
+            <button
+              className="reader-trigger"
               onClick={onOpenReader}
               title="Ouvrir le suivi de lecture"
             >
               <BookOpen size={18} />
             </button>
-            <button 
-              className={`ctrl-btn small ${isShuffle ? 'active' : ''}`} 
+            <button
+              className={`ctrl-btn small ${isShuffle ? 'active' : ''}`}
               onClick={() => setIsShuffle(!isShuffle)}
               title="Aléatoire"
             >
@@ -242,7 +340,7 @@ export default function AudioPlayer({
             <button className="ctrl-btn" onClick={onNext} title="Suivant">
               <SkipForward size={20} fill="currentColor" />
             </button>
-            <button 
+            <button
               className={`ctrl-btn small sleep-timer-btn ${sleepTimer ? 'active' : ''}`}
               onClick={toggleSleepTimer}
               title={sleepTimer ? `Minuteur : ${Math.ceil(timeLeft! / 60)}m restants` : "Minuteur de veille"}
@@ -255,7 +353,7 @@ export default function AudioPlayer({
                 </div>
               )}
             </button>
-            <button 
+            <button
               className={`ctrl-btn small ${playbackSpeed !== 1 ? 'active' : ''}`}
               onClick={() => {
                 const speeds = [1, 1.25, 1.5, 2, 0.75];
@@ -266,7 +364,7 @@ export default function AudioPlayer({
             >
               <span style={{ fontSize: '10px', fontWeight: 'bold' }}>{playbackSpeed}x</span>
             </button>
-            <button 
+            <button
               className={`ctrl-btn small ${isRepeat ? 'active' : ''}`}
               onClick={() => setIsRepeat(!isRepeat)}
               title="Répéter"
@@ -287,7 +385,7 @@ export default function AudioPlayer({
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
               </button>
               <div className="volume-track">
-                <input 
+                <input
                   type="range" min="0" max="100" value={isMuted ? 0 : volume}
                   onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
                   className="volume-slider"
@@ -297,8 +395,8 @@ export default function AudioPlayer({
           </div>
 
           {/* Mobile expand button */}
-          <button 
-            className="expand-btn" 
+          <button
+            className="expand-btn"
             onClick={() => setIsExpanded(!isExpanded)}
           >
             <ChevronDown size={20} style={{ transform: isExpanded ? 'rotate(180deg)' : 'none' }} />
@@ -313,25 +411,25 @@ export default function AudioPlayer({
               <span>{formatTime(duration)}</span>
             </div>
             <div className="mobile-extra">
-              <button 
-                className="reader-trigger" 
+              <button
+                className="reader-trigger"
                 onClick={onOpenReader}
               >
                 <BookOpen size={20} />
               </button>
-              <button 
+              <button
                 className={`ctrl-btn small ${isShuffle ? 'active' : ''}`}
                 onClick={() => setIsShuffle(!isShuffle)}
               >
                 <Shuffle size={18} />
               </button>
-              <button 
+              <button
                 className={`ctrl-btn small ${isRepeat ? 'active' : ''}`}
                 onClick={() => setIsRepeat(!isRepeat)}
               >
                 <Repeat size={18} />
               </button>
-              <button 
+              <button
                 className={`ctrl-btn small ${playbackSpeed !== 1 ? 'active' : ''}`}
                 onClick={() => {
                   const speeds = [1, 1.25, 1.5, 2, 0.75];
@@ -341,7 +439,7 @@ export default function AudioPlayer({
               >
                 <span style={{ fontSize: '11px', fontWeight: 'bold' }}>{playbackSpeed}x</span>
               </button>
-              <button 
+              <button
                 className={`ctrl-btn small sleep-timer-btn ${sleepTimer ? 'active' : ''}`}
                 onClick={toggleSleepTimer}
               >
@@ -355,7 +453,7 @@ export default function AudioPlayer({
               </button>
               <div className="mobile-volume">
                 {isMuted || volume === 0 ? <VolumeX size={16} /> : <Volume2 size={16} />}
-                <input 
+                <input
                   type="range" min="0" max="100" value={isMuted ? 0 : volume}
                   onChange={(e) => { setVolume(Number(e.target.value)); setIsMuted(false); }}
                   className="volume-slider"
@@ -369,12 +467,14 @@ export default function AudioPlayer({
       <audio
         ref={audioRef}
         src={audioUrl}
+        crossOrigin="anonymous"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
         onPlay={() => { setIsPlaying(true); onPlayStateChange?.(true); }}
         onPause={() => { setIsPlaying(false); onPlayStateChange?.(false); }}
       />
+
 
       <style jsx>{`
         .player-bar {
@@ -499,6 +599,19 @@ export default function AudioPlayer({
           min-width: 0;
         }
 
+        .player-title-row {
+          display: flex;
+          align-items: center;
+          gap: 0.75rem;
+        }
+
+        .player-visualizer {
+          display: flex;
+          align-items: center;
+          opacity: 0.8;
+          padding-bottom: 2px;
+        }
+
         .player-title {
           font-size: 0.9rem;
           font-weight: 600;
@@ -515,6 +628,7 @@ export default function AudioPlayer({
           overflow: hidden;
           text-overflow: ellipsis;
         }
+
 
         /* Center controls */
         .player-center {

@@ -1,14 +1,14 @@
 {
-  "name": "Quranify",
+  "name": "Quranify - L'expérience Coran Premium",
   "short_name": "Quranify",
-  "description": "Application d'écoute du Saint Coran",
+  "description": "Une expérience d'écoute du Coran immersive et premium avec suivi de lecture en direct.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#020617",
   "theme_color": "#38bdf8",
   "icons": [
     {
-      "src": "/logo.png",
+      "src": "/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"

@@ -1,7 +1,8 @@
 "use client";
 
 import { Surah } from "@/types/quran";
-import { Play, Pause, Heart } from "lucide-react";
+import { Play, Pause, Heart, Download, Check } from "lucide-react";
+
 
 interface SurahCardProps {
   surah: Surah;
@@ -11,9 +12,17 @@ interface SurahCardProps {
   isFavorite?: boolean;
   onToggleFavorite?: (surahId: number) => void;
   compact?: boolean;
+  isDownloaded?: boolean;
+  onDownload?: (surahId: number) => void;
+  isOnline?: boolean;
 }
 
-export default function SurahCard({ surah, isSelected, isPlaying, onSelect, isFavorite, onToggleFavorite, compact }: SurahCardProps) {
+
+export default function SurahCard({ 
+  surah, isSelected, isPlaying, onSelect, isFavorite, 
+  onToggleFavorite, compact, isDownloaded, onDownload, isOnline = true 
+}: SurahCardProps) {
+
   const isActive = isSelected && isPlaying;
   const isPaused = isSelected && !isPlaying;
 
@@ -52,7 +61,25 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, isFa
           >
             <Heart size={14} fill={isFavorite ? "currentColor" : "none"} strokeWidth={2.5} />
           </button>
+          
+          {isDownloaded ? (
+            <div className="download-badge success" title="Téléchargé">
+              <Check size={12} />
+            </div>
+          ) : isOnline && onDownload && (
+            <button 
+              className="download-btn-inline"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDownload(surah.id);
+              }}
+              title="Télécharger pour écoute hors ligne"
+            >
+              <Download size={14} />
+            </button>
+          )}
         </div>
+
         <div className="surah-details">
           <span className="surah-translation">{surah.translated_name.name}</span>
           <span className="surah-verses-count">{surah.verses_count} versets</span>
@@ -218,6 +245,42 @@ export default function SurahCard({ surah, isSelected, isPlaying, onSelect, isFa
           color: #f87171;
           filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.4));
         }
+
+        /* Download Button & Badge */
+        .download-btn-inline {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: rgba(148, 163, 184, 0.3);
+          transition: all 0.3s;
+          background: transparent;
+          border: none;
+          padding: 4px;
+          border-radius: 50%;
+          cursor: pointer;
+        }
+
+        .download-btn-inline:hover {
+          color: var(--accent-blue);
+          background: rgba(56, 189, 248, 0.1);
+          transform: scale(1.1);
+        }
+
+        .download-badge {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 2px;
+          border-radius: 50%;
+          font-size: 0.6rem;
+        }
+
+        .download-badge.success {
+          color: #22c55e;
+          background: rgba(34, 197, 94, 0.1);
+          border: 1px solid rgba(34, 197, 94, 0.2);
+        }
+
 
         /* Number */
         .surah-number-wrap {
