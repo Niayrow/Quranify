@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     siteName: "Quranify",
     images: [
       {
-        url: "/logo.png",
+        url: "/icon.png",
         width: 800,
         height: 800,
         alt: "Quranify - Le Saint Coran",
@@ -56,13 +56,13 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Quranify | Le Saint Coran en Ligne",
     description: "Écoutez et lisez le Saint Coran avec une interface moderne, fluide et immersive.",
-    images: ["/logo.png"],
+    images: ["/icon.png"],
   },
   manifest: "/manifest.json",
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
-    shortcut: "/logo.png",
+    icon: "/icon.png",
+    apple: "/icon.png",
+    shortcut: "/icon.png",
   },
   robots: {
     index: true,
