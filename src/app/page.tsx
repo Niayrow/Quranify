@@ -209,6 +209,8 @@ export default function Home() {
     recognition.continuous = false;
     recognition.interimResults = true;
 
+    let finalTranscript = "";
+
     recognition.onstart = () => {
       setIsListening(true);
       setVoiceTranscript("");
@@ -216,7 +218,8 @@ export default function Home() {
     };
 
     recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript.toLowerCase();
+      const transcript = event.results[0][0].transcript;
+      finalTranscript = transcript;
       setVoiceTranscript(transcript);
     };
 
@@ -227,22 +230,28 @@ export default function Home() {
 
     recognition.onend = () => {
       setIsListening(false);
-      processVoiceCommand();
+      processVoiceCommand(finalTranscript);
     };
 
     recognition.start();
   };
 
-  const processVoiceCommand = () => {
-    const command = voiceTranscript.toLowerCase();
+  const processVoiceCommand = (rawCommand: string) => {
+    const command = rawCommand.toLowerCase().trim();
     if (!command) return;
 
+    // Normalize strings to ignore accents, hyphens, and apostrophes
+    const normalize = (str: string) => str.toLowerCase().replace(/[-']/g, ' ').normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const normalizedCommand = normalize(command);
+
     // Search for Surahs
-    const foundSurah = surahs.find(s => 
-      command.includes(s.name_simple.toLowerCase()) || 
-      command.includes(s.name_arabic.toLowerCase()) ||
-      (command.includes("sourate") && command.includes(s.id.toString()))
-    );
+    const foundSurah = surahs.find(s => {
+      const name = normalize(s.name_simple);
+      const nameNoAl = name.replace(/^al\s+/, '');
+      return normalizedCommand.includes(name) || 
+             normalizedCommand.includes(nameNoAl) ||
+             (normalizedCommand.includes("sourate") && normalizedCommand.includes(s.id.toString()));
+    });
 
     if (foundSurah) {
       setVoiceFeedback(`Lancement de la sourate ${foundSurah.name_simple}...`);
@@ -251,9 +260,13 @@ export default function Home() {
     }
 
     // Search for Reciters
-    const foundReciter = reciters.find(r => 
-      command.includes(r.name.toLowerCase())
-    );
+    const foundReciter = reciters.find(r => {
+      const name = normalize(r.name);
+      const parts = name.split(' ');
+      // Match if the spoken text contains any significant part of the reciter's name (e.g., "husary", "sudais")
+      const hasMatch = parts.some(p => p.length > 3 && normalizedCommand.includes(p)) || normalizedCommand.includes(name);
+      return hasMatch;
+    });
 
     if (foundReciter) {
       setVoiceFeedback(`Sélection du récitateur ${foundReciter.name}...`);
@@ -261,8 +274,8 @@ export default function Home() {
       return;
     }
 
-    setVoiceFeedback("Désolé, je n'ai pas compris la commande.");
-    setTimeout(() => setVoiceFeedback(null), 3000);
+    setVoiceFeedback(`Je n'ai pas trouvé de résultat pour: "${rawCommand}"`);
+    setTimeout(() => setVoiceFeedback(null), 4000);
   };
 
   return (
