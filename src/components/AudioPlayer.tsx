@@ -109,6 +109,7 @@ export default function AudioPlayer({
         artist: reciterName,
         album: 'Quranify',
         artwork: [
+          { src: '/cover.png', sizes: '1024x1024', type: 'image/png' },
           { src: reciterImage || '/icon-512.png', sizes: '512x512', type: 'image/png' }
         ]
       });
