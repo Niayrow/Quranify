@@ -219,8 +219,10 @@ export default function Home() {
   };
   const playerAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handleSelectSurah = (surah: Surah) => {
-    if (selectedSurah?.id === surah.id) {
+  const handleSelectSurah = (surah: Surah, overrideReciter?: Reciter) => {
+    const activeReciter = overrideReciter || selectedReciter;
+    
+    if (selectedSurah?.id === surah.id && (!overrideReciter || overrideReciter.id === selectedReciter.id)) {
       // Toggle play/pause on the same surah
       if (playerAudioRef.current) {
         if (isPlaying) {
@@ -231,13 +233,13 @@ export default function Home() {
       }
     } else {
       setSelectedSurah(surah);
-      updateAudio(surah, selectedReciter);
+      updateAudio(surah, activeReciter);
       
       // Update history
       setHistory(prev => {
-        const newItem = { surahId: surah.id, reciterId: selectedReciter.id };
+        const newItem = { surahId: surah.id, reciterId: activeReciter.id };
         // Remove duplicate if exists
-        const filtered = prev.filter(item => !(item.surahId === surah.id && item.reciterId === selectedReciter.id));
+        const filtered = prev.filter(item => !(item.surahId === surah.id && item.reciterId === activeReciter.id));
         const newHistory = [newItem, ...filtered].slice(0, 10); // Keep last 10
         localStorage.setItem("quranify_history", JSON.stringify(newHistory));
         return newHistory;
@@ -268,7 +270,8 @@ export default function Home() {
     const pool = allowedReciters.length > 0 ? allowedReciters : reciters;
     
     const randomReciterIndex = Math.floor(Math.random() * pool.length);
-    setSelectedReciter(pool[randomReciterIndex]);
+    const newReciter = pool[randomReciterIndex];
+    setSelectedReciter(newReciter);
 
     // Respect the selected scope
     let targetSurahs = radioScope === 'juz_amma' ? surahs.filter(s => s.id >= 78) : surahs;
@@ -277,7 +280,7 @@ export default function Home() {
     if (targetSurahs.length === 0) targetSurahs = surahs;
 
     const randomSurahIndex = Math.floor(Math.random() * targetSurahs.length);
-    handleSelectSurah(targetSurahs[randomSurahIndex]);
+    handleSelectSurah(targetSurahs[randomSurahIndex], newReciter);
   };
 
 
@@ -711,7 +714,7 @@ export default function Home() {
                   className="history-card" 
                   onClick={() => {
                     setSelectedReciter(r);
-                    handleSelectSurah(s);
+                    handleSelectSurah(s, r);
                   }}
                 >
                    <div className="history-avatar">
