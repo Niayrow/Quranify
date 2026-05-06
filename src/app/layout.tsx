@@ -19,25 +19,25 @@ const amiri = Amiri({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#0a0a0a",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  themeColor: "#020617",
 };
 
 export const metadata: Metadata = {
-  title: {
-    default: "Quranify | Le Saint Coran en Ligne",
-    template: "%s | Quranify",
-  },
+  title: "Quranify | Le Saint Coran en Ligne",
   description: "Écoutez et lisez le Saint Coran avec une interface moderne, fluide et immersive. Quranify offre une expérience spirituelle unique pour écouter les meilleurs récitateurs.",
   keywords: ["Coran", "Quran", "Islam", "Récitation", "Traduction", "Écouter Coran", "Lire Coran", "Quranify", "App Coran"],
   authors: [{ name: "Quranify" }],
   creator: "Quranify",
   publisher: "Quranify",
   metadataBase: new URL("https://quranify.fr"),
+  alternates: {
+    canonical: "/",
+  },
   openGraph: {
     type: "website",
     locale: "fr_FR",
@@ -48,9 +48,9 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/icon.png",
-        width: 800,
-        height: 800,
-        alt: "Quranify - Le Saint Coran",
+        width: 512,
+        height: 512,
+        alt: "Quranify",
       },
     ],
   },
@@ -82,12 +82,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} ${amiri.variable} antialiased selection:bg-emerald-500/30 selection:text-emerald-200`}>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
-        <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-      </head>
+    <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} ${amiri.variable} antialiased`}>
       <body className="min-h-screen bg-neutral-950 text-white font-sans overflow-x-hidden flex flex-col relative">
         {children}
       </body>
