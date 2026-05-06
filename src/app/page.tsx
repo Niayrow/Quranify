@@ -941,6 +941,7 @@ export default function Home() {
           align-items: center;
           gap: 1.5rem;
           width: 100%;
+          flex-wrap: wrap;
         }
 
         .logo-group {

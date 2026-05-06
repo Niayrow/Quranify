@@ -74,17 +74,6 @@ export const metadata: Metadata = {
     apple: "/icon.png",
     shortcut: "/icon.png",
   },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      "max-video-preview": -1,
-      "max-image-preview": "large",
-      "max-snippet": -1,
-    },
-  },
 };
 
 export default function RootLayout({
@@ -94,6 +83,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr" className={`${geistSans.variable} ${geistMono.variable} ${amiri.variable} antialiased selection:bg-emerald-500/30 selection:text-emerald-200`}>
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+      </head>
       <body className="min-h-screen bg-neutral-950 text-white font-sans overflow-x-hidden flex flex-col relative">
         {children}
       </body>
