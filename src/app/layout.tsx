@@ -23,6 +23,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -57,6 +59,14 @@ export const metadata: Metadata = {
     title: "Quranify | Le Saint Coran en Ligne",
     description: "Écoutez et lisez le Saint Coran avec une interface moderne, fluide et immersive.",
     images: ["/icon.png"],
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Quranify",
+  },
+  formatDetection: {
+    telephone: false,
   },
   manifest: "/manifest.json",
   icons: {

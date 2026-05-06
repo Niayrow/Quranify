@@ -532,6 +532,7 @@ export default function AudioPlayer({
           z-index: 3000;
           transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
           box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.4);
+          padding-bottom: env(safe-area-inset-bottom, 0.5rem);
         }
 
         /* Progress on top */

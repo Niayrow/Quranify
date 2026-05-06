@@ -24,6 +24,12 @@ body {
   line-height: 1.5;
   overflow-x: hidden;
   transition: background-color 1.5s ease;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+html {
+  scrollbar-gutter: stable;
 }
 
 .glass-card {

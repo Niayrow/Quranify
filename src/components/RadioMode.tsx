@@ -266,7 +266,8 @@ export default function RadioMode({
           right: 0;
           bottom: 0;
           width: 350px;
-          background: rgba(15, 23, 42, 0.85);
+          max-width: 100%;
+          background: rgba(15, 23, 42, 0.95);
           backdrop-filter: blur(20px);
           border-left: 1px solid rgba(255, 255, 255, 0.1);
           z-index: 90;
