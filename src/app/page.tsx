@@ -185,11 +185,7 @@ export default function Home() {
     setFilteredSurahs(filtered);
   }, [search, surahs, favorites, showOnlyFavorites, isOnline, downloadedIds]);
 
-  useEffect(() => {
-    if (selectedSurah && selectedReciter) {
-      updateAudio(selectedSurah, selectedReciter);
-    }
-  }, [selectedSurah, selectedReciter]);
+  // We call updateAudio directly in selectors now for speed
 
   // Listening Time Tracker
   useEffect(() => {
@@ -235,6 +231,7 @@ export default function Home() {
       }
     } else {
       setSelectedSurah(surah);
+      updateAudio(surah, selectedReciter);
       
       // Update history
       setHistory(prev => {
@@ -257,7 +254,9 @@ export default function Home() {
     if (!selectedSurah) return;
     const currentIndex = surahs.findIndex((s) => s.id === selectedSurah.id);
     if (currentIndex < surahs.length - 1) {
-      handleSelectSurah(surahs[currentIndex + 1]);
+      const nextSurah = surahs[currentIndex + 1];
+      setSelectedSurah(nextSurah);
+      updateAudio(nextSurah, selectedReciter);
     }
   };
 
@@ -316,7 +315,9 @@ export default function Home() {
     if (!selectedSurah) return;
     const currentIndex = surahs.findIndex((s) => s.id === selectedSurah.id);
     if (currentIndex > 0) {
-      handleSelectSurah(surahs[currentIndex - 1]);
+      const prevSurah = surahs[currentIndex - 1];
+      setSelectedSurah(prevSurah);
+      updateAudio(prevSurah, selectedReciter);
     }
   };
 

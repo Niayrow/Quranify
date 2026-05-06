@@ -48,8 +48,6 @@ export default function AudioPlayer({
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const isSourceConnected = useRef(false);
 
-
-
   const formatTime = (time: number) => {
     if (isNaN(time) || time === 0) return "0:00";
     const hours = Math.floor(time / 3600);
@@ -61,22 +59,47 @@ export default function AudioPlayer({
     return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
-  // Wake Lock
-  useEffect(() => {
-    let wakeLock: any = null;
-    const requestWakeLock = async () => {
+  const wakeLockRef = useRef<any>(null);
+
+  const requestWakeLock = useCallback(async () => {
+    if ('wakeLock' in navigator && !wakeLockRef.current) {
       try {
-        if ('wakeLock' in navigator) {
-          wakeLock = await (navigator as any).wakeLock.request('screen');
-        }
-      } catch (err: any) {
-        console.error(err?.message);
+        wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+      } catch (err) {
+        console.warn("Wake Lock request failed");
+      }
+    }
+  }, []);
+
+  const releaseWakeLock = useCallback(async () => {
+    if (wakeLockRef.current) {
+      try {
+        await wakeLockRef.current.release();
+      } catch (e) {}
+      wakeLockRef.current = null;
+    }
+  }, []);
+
+  // Wake Lock management
+  useEffect(() => {
+    if (isPlaying) {
+      requestWakeLock();
+    } else {
+      releaseWakeLock();
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isPlaying) {
+        requestWakeLock();
       }
     };
-    if (isPlaying) requestWakeLock();
-    else if (wakeLock) { wakeLock.release(); wakeLock = null; }
-    return () => { if (wakeLock) wakeLock.release(); };
-  }, [isPlaying]);
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseWakeLock();
+    };
+  }, [isPlaying, requestWakeLock, releaseWakeLock]);
 
   // Auto-play on URL change
   useEffect(() => {
@@ -101,7 +124,18 @@ export default function AudioPlayer({
     }
   }, [playbackSpeed]);
 
-  // Media Session API (Lockscreen Controls & Notifications)
+  const togglePlay = useCallback(() => {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(() => { });
+    }
+    setIsPlaying(!isPlaying);
+  }, [isPlaying]);
+
+  // Consolidated Media Session API
   useEffect(() => {
     if ('mediaSession' in navigator && audioUrl) {
       navigator.mediaSession.metadata = new MediaMetadata({
@@ -109,19 +143,13 @@ export default function AudioPlayer({
         artist: reciterName,
         album: 'Quranify',
         artwork: [
-          { src: '/cover.png', sizes: '1024x1024', type: 'image/png' },
-          { src: reciterImage || '/icon-512.png', sizes: '512x512', type: 'image/png' }
+          { src: '/icon.png', sizes: '512x512', type: 'image/png' },
+          { src: reciterImage || '/icon.png', sizes: '512x512', type: 'image/png' }
         ]
       });
 
-      navigator.mediaSession.setActionHandler('play', () => {
-        audioRef.current?.play();
-        setIsPlaying(true);
-      });
-      navigator.mediaSession.setActionHandler('pause', () => {
-        audioRef.current?.pause();
-        setIsPlaying(false);
-      });
+      navigator.mediaSession.setActionHandler('play', () => togglePlay());
+      navigator.mediaSession.setActionHandler('pause', () => togglePlay());
       if (onPrevious) {
         navigator.mediaSession.setActionHandler('previoustrack', () => onPrevious());
       }
@@ -136,7 +164,7 @@ export default function AudioPlayer({
         navigator.mediaSession.setActionHandler('nexttrack', null);
       };
     }
-  }, [audioUrl, surahName, reciterName, reciterImage, onNext, onPrevious]);
+  }, [audioUrl, surahName, reciterName, reciterImage, onNext, onPrevious, togglePlay]);
 
   // Sync playback state with Media Session
   useEffect(() => {
@@ -252,19 +280,6 @@ export default function AudioPlayer({
     }
   }, [isPlaying, initVisualizer]);
 
-  const togglePlay = useCallback(() => {
-    if (!audioRef.current) return;
-
-    if (isPlaying) {
-      audioRef.current.pause();
-    } else {
-      audioRef.current.play().catch(() => { });
-    }
-    setIsPlaying(!isPlaying);
-  }, [isPlaying]);
-
-
-
   const handleTimeUpdate = () => {
     if (audioRef.current) {
       const cur = audioRef.current.currentTime;
@@ -304,21 +319,6 @@ export default function AudioPlayer({
       setIsPlaying(false);
     }
   };
-
-  // Media Session API for lock screen controls
-  useEffect(() => {
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: surahName,
-        artist: reciterName,
-        album: 'Quranify',
-      });
-      navigator.mediaSession.setActionHandler('play', () => togglePlay());
-      navigator.mediaSession.setActionHandler('pause', () => togglePlay());
-      navigator.mediaSession.setActionHandler('previoustrack', () => onPrevious?.());
-      navigator.mediaSession.setActionHandler('nexttrack', () => onNext?.());
-    }
-  }, [surahName, reciterName, togglePlay, onNext, onPrevious]);
 
   if (!audioUrl) return null;
 
@@ -712,7 +712,7 @@ export default function AudioPlayer({
           color: var(--text-secondary);
           transition: all 0.2s;
           flex-shrink: 0;
-          position: relative; /* Added for badge positioning */
+          position: relative; 
         }
 
         .ctrl-btn:hover {
