@@ -134,7 +134,16 @@ export default function Home() {
     // Register SW with forced update
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').then((reg) => {
-        reg.update(); // Force check for new SW version
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          newWorker?.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              // Nouveau Service Worker installé, on recharge pour appliquer les changements
+              window.location.reload();
+            }
+          });
+        });
+        reg.update();
       }).catch(() => {});
     }
 
@@ -758,7 +767,7 @@ export default function Home() {
       {loading ? (
         <div className="loading-state">
           <div className="loading-logo-wrap">
-            <img src="/logo.png" alt="Quranify Logo" className="loading-logo" />
+            <img src="/icon.png" alt="Quranify Logo" className="loading-logo" />
             <div className="pulse-ring" />
           </div>
           <p>Chargement des sourates...</p>

@@ -197,7 +197,7 @@ export default function ReciterSelect({ reciters, selectedReciterId, onSelect, i
       <div className="reciter-top">
         <div className="reciter-top-bar">
           <div className="reciter-title-wrap">
-            <img src="/logo.png" alt="" className="reciter-logo-mini" />
+            <img src="/icon.png" alt="" className="reciter-logo-mini" />
             <div>
               <h2>Récitateurs</h2>
               <p className="reciter-count">{reciters.length} disponibles</p>

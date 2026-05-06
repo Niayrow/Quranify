@@ -1,10 +1,10 @@
-const CACHE_NAME = 'quranify-cache-v2';
+const CACHE_NAME = 'quranify-cache-v3';
 const AUDIO_CACHE = 'quranify-audio';
 
 // Only cache truly static assets
 const STATIC_ASSETS = [
   '/icon-512.png',
-  '/logo.png',
+  '/icon.png',
   '/manifest.json'
 ];
 
@@ -55,10 +55,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Everything else (HTML, CSS, JS): network-first, cache fallback
+  // Everything else (HTML, CSS, JS): network-first, save to cache, fallback to cache
   event.respondWith(
     fetch(event.request)
       .then((response) => {
+        // Only cache basic responses (no cors, no opaque)
+        if (response.ok && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+          });
+        }
         return response;
       })
       .catch(() => {
