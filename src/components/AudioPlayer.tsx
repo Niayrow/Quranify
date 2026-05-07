@@ -512,9 +512,20 @@ export default function AudioPlayer({
         ref={audioRef}
         src={audioUrl}
         crossOrigin="anonymous"
+        autoPlay={isPlaying}
+        preload="auto"
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={handleEnded}
+        onError={(e) => {
+          console.error("Audio playback error:", e.currentTarget.error);
+          // If playback errors out while it's supposed to be playing, skip to next after a delay
+          if (isPlaying && onNext) {
+            setTimeout(() => onNext(), 1500);
+          }
+        }}
+        onStalled={() => console.warn("Audio stream stalled")}
+        onWaiting={() => console.warn("Audio stream waiting for data")}
         onPlay={() => { setIsPlaying(true); onPlayStateChange?.(true); }}
         onPause={() => { setIsPlaying(false); onPlayStateChange?.(false); }}
       />

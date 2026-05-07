@@ -4,12 +4,14 @@ import React from "react";
 import { X, Clock, Calendar, BarChart3, Trophy, Headphones } from "lucide-react";
 
 interface StatsModalProps {
+  isOpen: boolean;
   totalSeconds: number;
   todaySeconds: number;
   onClose: () => void;
 }
 
-export default function StatsModal({ totalSeconds, todaySeconds, onClose }: StatsModalProps) {
+export default function StatsModal({ isOpen, totalSeconds, todaySeconds, onClose }: StatsModalProps) {
+  if (!isOpen) return null;
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600);
     const m = Math.floor((seconds % 3600) / 60);

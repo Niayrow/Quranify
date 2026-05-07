@@ -1,7 +1,8 @@
 "use client";
 
+import React, { useState, useEffect } from "react";
 import { Surah } from "@/types/quran";
-import { Play, Pause, Heart, Download, Check } from "lucide-react";
+import { Play, Pause, Heart, Download, Check, Info } from "lucide-react";
 
 
 interface SurahCardProps {
@@ -15,13 +16,53 @@ interface SurahCardProps {
   isDownloaded?: boolean;
   onDownload?: (surahId: number) => void;
   isOnline?: boolean;
+  onContextMenuClick?: (e: React.MouseEvent, surah: Surah) => void;
+  downloadProgress?: number;
 }
 
 
 export default function SurahCard({ 
   surah, isSelected, isPlaying, onSelect, isFavorite, 
-  onToggleFavorite, compact, isDownloaded, onDownload, isOnline = true 
+  onToggleFavorite, compact, isDownloaded, onDownload, isOnline = true, onContextMenuClick,
+  downloadProgress
 }: SurahCardProps) {
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    if (onContextMenuClick) {
+      e.preventDefault();
+      e.stopPropagation();
+      onContextMenuClick(e, surah);
+    }
+  };
+
+  const longPressTimer = React.useRef<NodeJS.Timeout | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (!onContextMenuClick) return;
+    const touch = e.touches[0];
+    const clientX = touch.clientX;
+    const clientY = touch.clientY;
+
+    longPressTimer.current = setTimeout(() => {
+      if (navigator.vibrate) navigator.vibrate(50); // slight haptic feedback
+      
+      const syntheticEvent = {
+        clientX,
+        clientY,
+        preventDefault: () => {},
+        stopPropagation: () => {}
+      } as unknown as React.MouseEvent;
+      
+      onContextMenuClick(syntheticEvent, surah);
+    }, 600); // 600ms for long press
+  };
+
+  const clearLongPress = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+  };
 
   const isActive = isSelected && isPlaying;
   const isPaused = isSelected && !isPlaying;
@@ -30,6 +71,11 @@ export default function SurahCard({
     <div 
       className={`surah-card ${isSelected ? 'selected' : ''} ${isActive ? 'playing' : ''} ${isPaused ? 'paused' : ''} ${compact ? 'compact' : ''}`}
       onClick={() => onSelect(surah)}
+      onContextMenu={handleContextMenu}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={clearLongPress}
+      onTouchMove={clearLongPress}
+      onTouchCancel={clearLongPress}
     >
       {/* Animated glow background for active surah */}
       {isSelected && <div className="active-glow" />}
@@ -124,6 +170,16 @@ export default function SurahCard({
         </div>
       )}
 
+      {/* Download Progress */}
+      {downloadProgress !== undefined && (
+        <div className="download-progress-wrap">
+          <div className="download-progress-bar">
+            <div className="download-progress-fill" style={{ width: `${downloadProgress}%` }} />
+          </div>
+          <div className="download-label">Téléchargement {downloadProgress}%</div>
+        </div>
+      )}
+
       <style jsx>{`
         .surah-card {
           display: flex;
@@ -138,6 +194,8 @@ export default function SurahCard({
           background: rgba(15, 23, 42, 0.4);
           overflow: hidden;
           user-select: none;
+          -webkit-user-select: none;
+          -webkit-touch-callout: none;
         }
 
         .surah-card.compact {
@@ -559,6 +617,48 @@ export default function SurahCard({
           .play-icon-wrap {
             opacity: 1;
           }
+        }
+
+        .download-progress-wrap {
+          position: absolute;
+          inset: 0;
+          background: rgba(15, 23, 42, 0.9);
+          backdrop-filter: blur(8px);
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
+          animation: fadeIn 0.3s ease;
+        }
+
+        .download-progress-bar {
+          width: 70%;
+          height: 6px;
+          background: rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          overflow: hidden;
+          margin-bottom: 0.75rem;
+        }
+
+        .download-progress-fill {
+          height: 100%;
+          background: var(--accent-blue);
+          box-shadow: 0 0 15px var(--accent-blue-glow);
+          transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .download-label {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: white;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+
+        @keyframes fadeIn {
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
       `}</style>
     </div>

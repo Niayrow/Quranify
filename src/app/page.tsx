@@ -9,7 +9,8 @@ import SurahReader from "@/components/SurahReader";
 import RadioMode from "@/components/RadioMode";
 import DynamicBackground, { ThemeType } from "@/components/DynamicBackground";
 import StatsModal from "@/components/StatsModal";
-import { Search, Music2, Users, BookOpen, X, Mic, ChevronRight, Heart, Play, Shuffle, Volume2, MicOff, Radio, Palette, Activity } from "lucide-react";
+import DownloadsModal from "@/components/DownloadsModal";
+import { Search, Music2, Users, BookOpen, X, Mic, ChevronRight, Heart, Play, Shuffle, Volume2, MicOff, Radio, Palette, Activity, Download, Check, Info, Library, Trash2 } from "lucide-react";
 
 
 
@@ -70,8 +71,56 @@ export default function Home() {
   // Offline/Download State
   const [isOnline, setIsOnline] = useState(true);
   const [downloadedIds, setDownloadedIds] = useState<number[]>([]);
+  const [downloadItems, setDownloadItems] = useState<{ surahId: number, reciterId: number }[]>([]);
+  const [downloadProgress, setDownloadProgress] = useState<Record<string, number>>({});
+  const [isDownloadsOpen, setIsDownloadsOpen] = useState(false);
 
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, surah: Surah } | null>(null);
+  const contextMenuRef = useRef<{ x: number, y: number, surah: Surah } | null>(null);
 
+  // Keep ref in sync with state
+  useEffect(() => {
+    contextMenuRef.current = contextMenu;
+  }, [contextMenu]);
+
+  useEffect(() => {
+    const handleDismiss = (e: Event) => {
+      // If it's a mousedown and it's a right click (button 2), don't dismiss
+      if (e instanceof MouseEvent && e.button === 2) return;
+      
+      if (contextMenuRef.current) {
+        setContextMenu(null);
+      }
+    };
+
+    document.addEventListener("mousedown", handleDismiss as EventListener);
+    window.addEventListener("scroll", handleDismiss, true);
+    return () => {
+      document.removeEventListener("mousedown", handleDismiss as EventListener);
+      window.removeEventListener("scroll", handleDismiss, true);
+    };
+  }, []);
+
+  const handleContextMenuClick = (e: React.MouseEvent, surah: Surah) => {
+    // Prevent default browser menu
+    e.preventDefault();
+    e.stopPropagation();
+    
+    let x = e.clientX;
+    let y = e.clientY;
+    
+    const menuWidth = 220;
+    const menuHeight = 250;
+    
+    // Ensure it stays within viewport
+    if (x + menuWidth > window.innerWidth) x = window.innerWidth - menuWidth - 10;
+    if (y + menuHeight > window.innerHeight) y = window.innerHeight - menuHeight - 10;
+    if (x < 10) x = 10;
+    if (y < 10) y = 10;
+    
+    setContextMenu({ x, y, surah });
+  };
 
 
 
@@ -82,6 +131,11 @@ export default function Home() {
       .then((data) => {
         setSurahs(data.chapters);
         setFilteredSurahs(data.chapters);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch surahs", err);
+        // If we are offline and have no cache yet, we still want to stop loading
         setLoading(false);
       });
 
@@ -169,6 +223,11 @@ export default function Home() {
     const savedDownloads = localStorage.getItem("quranify_downloads");
     if (savedDownloads) {
       try { setDownloadedIds(JSON.parse(savedDownloads)); } catch (e) {}
+    }
+
+    const savedItems = localStorage.getItem("quranify_download_items");
+    if (savedItems) {
+      try { setDownloadItems(JSON.parse(savedItems)); } catch (e) {}
     }
   }, []);
 
@@ -505,6 +564,13 @@ export default function Home() {
   };
 
   const handleDownloadSurah = async (surahId: number) => {
+    const reciterId = selectedReciter.id;
+    const progressKey = `${reciterId}-${surahId}`;
+
+    if (downloadItems.some(d => d.surahId === surahId && d.reciterId === reciterId)) {
+      return;
+    }
+
     try {
       const url = `${selectedReciter.server}${surahId.toString().padStart(3, '0')}.mp3`;
       const cache = await caches.open('quranify-audio');
@@ -512,18 +578,108 @@ export default function Home() {
       const response = await fetch(url);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
-      await cache.put(url, response);
+      const contentLength = response.headers.get('content-length');
+      const total = contentLength ? parseInt(contentLength, 10) : 0;
       
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("ReadableStream not supported");
+
+      setDownloadProgress(prev => ({ ...prev, [progressKey]: 0 }));
+
+      let loaded = 0;
+      const chunks: Uint8Array[] = [];
+      
+      while(true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        
+        chunks.push(value);
+        loaded += value.length;
+        
+        if (total > 0) {
+          const progress = Math.round((loaded / total) * 100);
+          // Throttled update to avoid excessive re-renders
+          if (progress % 5 === 0 || progress === 100) {
+            setDownloadProgress(prev => ({ ...prev, [progressKey]: progress }));
+          }
+        }
+      }
+
+      const combinedResponse = new Response(new Blob(chunks as any), {
+        headers: response.headers
+      });
+
+      await cache.put(url, combinedResponse);
+      
+      setDownloadProgress(prev => {
+        const next = { ...prev };
+        delete next[progressKey];
+        return next;
+      });
+
       setDownloadedIds(prev => {
         if (prev.includes(surahId)) return prev;
         const next = [...prev, surahId];
         localStorage.setItem("quranify_downloads", JSON.stringify(next));
         return next;
       });
+
+      setDownloadItems(prev => {
+        const alreadyHas = prev.some(d => d.surahId === surahId && d.reciterId === reciterId);
+        if (alreadyHas) return prev;
+        const next = [...prev, { surahId, reciterId }];
+        localStorage.setItem("quranify_download_items", JSON.stringify(next));
+        return next;
+      });
     } catch (e) {
       console.error("Download failed", e);
+      setDownloadProgress(prev => {
+        const next = { ...prev };
+        delete next[progressKey];
+        return next;
+      });
       alert("Erreur lors du téléchargement. Veuillez vérifier votre connexion.");
     }
+  };
+
+  const removeDownload = async (surahId: number, reciterId: number) => {
+    try {
+      const reciter = reciters.find(r => r.id === reciterId);
+      if (!reciter) return;
+      
+      const url = `${reciter.server}${surahId.toString().padStart(3, '0')}.mp3`;
+      const cache = await caches.open('quranify-audio');
+      await cache.delete(url);
+      
+      setDownloadItems(prev => {
+        const next = prev.filter(d => !(d.surahId === surahId && d.reciterId === reciterId));
+        localStorage.setItem("quranify_download_items", JSON.stringify(next));
+        
+        // Update downloadedIds using the new 'next' state to avoid stale closure issues
+        setDownloadedIds(prevIds => {
+          const stillHasAnyVersion = next.some(d => d.surahId === surahId);
+          if (!stillHasAnyVersion) {
+            const nextIds = prevIds.filter(id => id !== surahId);
+            localStorage.setItem("quranify_downloads", JSON.stringify(nextIds));
+            return nextIds;
+          }
+          return prevIds;
+        });
+
+        return next;
+      });
+    } catch (e) {
+      console.error("Failed to remove download", e);
+    }
+  };
+
+  const handlePlayFromLibrary = (surah: Surah, reciter: Reciter) => {
+    setSelectedReciter(reciter);
+    localStorage.setItem("quranify_reciter", JSON.stringify(reciter));
+    // Small delay to ensure state update before starting play
+    setTimeout(() => {
+      handleSelectSurah(surah);
+    }, 100);
   };
 
 
@@ -631,6 +787,15 @@ export default function Home() {
             <span className="hidden sm:inline">Favoris</span>
           </button>
 
+
+          <button 
+            className="header-action-btn"
+            onClick={() => setIsDownloadsOpen(true)}
+            title="Bibliothèque hors-ligne"
+          >
+            <Library size={18} />
+            <span className="hidden sm:inline">Bibliothèque</span>
+          </button>
 
           <button 
             className="header-action-btn"
@@ -784,9 +949,11 @@ export default function Home() {
               isFavorite={favorites.includes(surah.id)}
               onToggleFavorite={toggleFavorite}
               compact={viewMode === 'list'}
-              isDownloaded={downloadedIds.includes(surah.id)}
+              isDownloaded={downloadItems.some(d => d.surahId === surah.id && d.reciterId === selectedReciter.id)}
               onDownload={handleDownloadSurah}
               isOnline={isOnline}
+              onContextMenuClick={handleContextMenuClick}
+              downloadProgress={downloadProgress[`${selectedReciter.id}-${surah.id}`]}
             />
 
           ))}
@@ -868,6 +1035,22 @@ export default function Home() {
         onClose={() => setIsReciterOpen(false)}
       />
 
+      <DownloadsModal 
+        isOpen={isDownloadsOpen}
+        onClose={() => setIsDownloadsOpen(false)}
+        downloads={downloadItems}
+        surahs={surahs}
+        reciters={reciters}
+        onPlay={handlePlayFromLibrary}
+        onRemove={removeDownload}
+      />
+
+      <StatsModal 
+        isOpen={isStatsOpen}
+        onClose={() => setIsStatsOpen(false)}
+        totalSeconds={listeningStats.total}
+        todaySeconds={listeningStats.today}
+      />
 
       {/* Radio Overlay */}
       {isRadioMode && (
@@ -903,14 +1086,6 @@ export default function Home() {
 
       )}
 
-      {/* Stats Modal */}
-      {isStatsOpen && (
-        <StatsModal 
-          totalSeconds={listeningStats.total}
-          todaySeconds={listeningStats.today}
-          onClose={() => setIsStatsOpen(false)}
-        />
-      )}
 
       {/* Voice Search Overlay */}
 
@@ -931,6 +1106,118 @@ export default function Home() {
           <Volume2 size={16} />
           <span>{voiceFeedback}</span>
         </div>
+      )}
+
+      {/* Global Context Menu - Using a Portal for maximum reliability */}
+      {typeof document !== 'undefined' && contextMenu && require('react-dom').createPortal(
+        <div 
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            background: 'rgba(15, 23, 42, 0.98)',
+            backdropFilter: 'blur(20px)',
+            WebkitBackdropFilter: 'blur(20px)',
+            border: '1px solid rgba(56, 189, 248, 0.3)',
+            borderRadius: '1rem',
+            padding: '0.5rem',
+            minWidth: '220px',
+            zIndex: 999999,
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(56, 189, 248, 0.1)',
+            display: 'flex',
+            flexDirection: 'column' as const,
+            gap: '4px',
+            animation: 'menuFade 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+            transformOrigin: 'top left',
+            pointerEvents: 'auto',
+          }}
+          onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+        >
+          <div style={{ padding: '0.4rem 0.8rem', fontSize: '0.7rem', color: 'var(--accent-blue)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.8, borderBottom: '1px solid rgba(255,255,255,0.05)', marginBottom: '4px' }}>
+            Options Sourate
+          </div>
+
+          <button 
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.85rem',
+              width: '100%', padding: '0.75rem 0.85rem',
+              background: 'transparent', border: 'none',
+              color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+              borderRadius: '0.6rem', cursor: 'pointer', textAlign: 'left' as const,
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(56, 189, 248, 0.15)'; e.currentTarget.style.color = 'var(--accent-blue)'; e.currentTarget.style.transform = 'translateX(4px)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.transform = 'translateX(0)'; }}
+            onClick={() => { handleSelectSurah(contextMenu.surah); setContextMenu(null); }}
+          >
+            <Play size={16} fill="currentColor" style={{ opacity: 0.8 }} /> <span>Écouter maintenant</span>
+          </button>
+          
+          <button 
+            style={{
+              display: 'flex', alignItems: 'center', gap: '0.85rem',
+              width: '100%', padding: '0.75rem 0.85rem',
+              background: 'transparent', border: 'none',
+              color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+              borderRadius: '0.6rem', cursor: 'pointer', textAlign: 'left' as const,
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)'; e.currentTarget.style.color = '#f87171'; e.currentTarget.style.transform = 'translateX(4px)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.transform = 'translateX(0)'; }}
+            onClick={() => { toggleFavorite(contextMenu.surah.id); setContextMenu(null); }}
+          >
+            <Heart size={16} fill={favorites.includes(contextMenu.surah.id) ? "currentColor" : "none"} style={{ opacity: 0.8 }} /> 
+            <span>{favorites.includes(contextMenu.surah.id) ? "Retirer des favoris" : "Ajouter aux favoris"}</span>
+          </button>
+
+          {isOnline && !downloadItems.some(d => d.surahId === contextMenu.surah.id && d.reciterId === selectedReciter.id) && (
+            <button 
+              style={{
+                display: 'flex', alignItems: 'center', gap: '0.85rem',
+                width: '100%', padding: '0.75rem 0.85rem',
+                background: 'transparent', border: 'none',
+                color: 'var(--text-primary)', fontSize: '0.85rem', fontWeight: 600,
+                borderRadius: '0.6rem', cursor: 'pointer', textAlign: 'left' as const,
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(34, 197, 94, 0.1)'; e.currentTarget.style.color = '#4ade80'; e.currentTarget.style.transform = 'translateX(4px)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.transform = 'translateX(0)'; }}
+              onClick={() => { handleDownloadSurah(contextMenu.surah.id); setContextMenu(null); }}
+            >
+              <Download size={16} style={{ opacity: 0.8 }} /> <span>Télécharger en local</span>
+            </button>
+          )}
+          
+          {downloadItems.some(d => d.surahId === contextMenu.surah.id && d.reciterId === selectedReciter.id) && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: '0.85rem',
+              width: '100%', padding: '0.75rem 0.85rem',
+              color: '#4ade80', fontSize: '0.85rem', fontWeight: 600,
+              borderRadius: '0.6rem', opacity: 0.8,
+            }}>
+              <Check size={16} /> <span>Sourate téléchargée</span>
+            </div>
+          )}
+
+          <div style={{
+            display: 'flex', alignItems: 'flex-start', gap: '0.85rem',
+            width: '100%', padding: '0.8rem 0.85rem',
+            color: 'var(--text-secondary)', fontSize: '0.75rem',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+            marginTop: '4px',
+            background: 'rgba(255,255,255,0.02)',
+            borderRadius: '0 0 0.6rem 0.6rem'
+          }}>
+            <Info size={16} style={{ opacity: 0.6, marginTop: '2px' }} /> 
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1px' }}>
+              <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{contextMenu.surah.name_simple}</span>
+              <span>{contextMenu.surah.verses_count} Versets • {contextMenu.surah.translated_name.name}</span>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
       <style jsx>{`
@@ -981,6 +1268,12 @@ export default function Home() {
           transform: translateY(-2px) scale(1.05);
           box-shadow: 0 6px 20px var(--accent-blue-glow);
         }
+
+        @keyframes pulseRing {
+          0% { transform: scale(0.8); opacity: 0.5; }
+          100% { transform: scale(1.3); opacity: 0; }
+        }
+
 
         @keyframes bounceIn {
           from { transform: scale(0); opacity: 0; }
@@ -1801,6 +2094,12 @@ export default function Home() {
           }
         }
 
+      `}</style>
+      <style jsx global>{`
+        @keyframes menuFade {
+          from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+          to { opacity: 1; transform: scale(1) translateY(0); }
+        }
       `}</style>
     </main>
   );
