@@ -10,7 +10,9 @@ import RadioMode from "@/components/RadioMode";
 import DynamicBackground, { ThemeType } from "@/components/DynamicBackground";
 import StatsModal from "@/components/StatsModal";
 import DownloadsModal from "@/components/DownloadsModal";
-import { Search, Music2, Users, BookOpen, X, Mic, ChevronRight, Heart, Play, Shuffle, Volume2, MicOff, Radio, Palette, Activity, Download, Check, Info, Library, Trash2 } from "lucide-react";
+import OnboardingModal from "@/components/OnboardingModal";
+import ChangelogModal from "@/components/ChangelogModal";
+import { Search, Music2, Users, BookOpen, X, Mic, ChevronRight, Heart, Play, Shuffle, Volume2, MicOff, Radio, Palette, Activity, Download, Check, Info, Library, Trash2, History } from "lucide-react";
 
 
 
@@ -78,6 +80,12 @@ export default function Home() {
   // Context Menu State
   const [contextMenu, setContextMenu] = useState<{ x: number, y: number, surah: Surah } | null>(null);
   const contextMenuRef = useRef<{ x: number, y: number, surah: Surah } | null>(null);
+
+  // Onboarding State
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
+
+  // Changelog State
+  const [isChangelogOpen, setIsChangelogOpen] = useState(false);
 
   // Keep ref in sync with state
   useEffect(() => {
@@ -161,6 +169,12 @@ export default function Home() {
     // Load saved theme
     const savedTheme = localStorage.getItem("quranify_theme") as ThemeType;
     if (savedTheme) setTheme(savedTheme);
+
+    // Load onboarding status
+    const onboardingDone = localStorage.getItem("quranify_onboarding_completed");
+    if (!onboardingDone) {
+      setIsOnboardingOpen(true);
+    }
 
     // Load listening stats
     const totalSec = parseInt(localStorage.getItem("quranify_total_sec") || "0");
@@ -832,7 +846,7 @@ export default function Home() {
         onClick={() => setIsReciterOpen(true)}
       >
         <div className="reciter-sel-left">
-          <div className="reciter-sel-icon">
+          <div className="reciter-sel-icon" style={{ width: '38px', height: '38px', minWidth: '38px' }}>
             {selectedReciter.image ? (
               <img src={selectedReciter.image} alt="" className="sel-avatar-img" />
             ) : (
@@ -979,6 +993,11 @@ export default function Home() {
             Créé avec ❤️ par <a href="https://sofianeweb.fr" target="_blank" rel="noopener noreferrer">sofianeweb.fr</a>
           </p>
 
+          <div className="footer-actions">
+            <button className="changelog-btn" onClick={() => setIsChangelogOpen(true)}>
+              <History size={14} /> Historique des MAJ
+            </button>
+          </div>
         </div>
       </footer>
 
@@ -1050,6 +1069,19 @@ export default function Home() {
         onClose={() => setIsStatsOpen(false)}
         totalSeconds={listeningStats.total}
         todaySeconds={listeningStats.today}
+      />
+
+      <OnboardingModal 
+        isOpen={isOnboardingOpen} 
+        onClose={() => {
+          setIsOnboardingOpen(false);
+          localStorage.setItem("quranify_onboarding_completed", "true");
+        }} 
+      />
+
+      <ChangelogModal 
+        isOpen={isChangelogOpen}
+        onClose={() => setIsChangelogOpen(false)}
       />
 
       {/* Radio Overlay */}
@@ -2018,6 +2050,34 @@ export default function Home() {
           font-size: 0.75rem;
           color: var(--text-secondary);
           opacity: 0.6;
+        }
+
+        .footer-actions {
+          margin-top: 1rem;
+          display: flex;
+          justify-content: center;
+        }
+
+        .changelog-btn {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          background: rgba(255, 255, 255, 0.03);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          color: var(--text-secondary);
+          font-size: 0.75rem;
+          font-weight: 600;
+          padding: 0.5rem 1rem;
+          border-radius: 2rem;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .changelog-btn:hover {
+          background: rgba(56, 189, 248, 0.1);
+          border-color: rgba(56, 189, 248, 0.2);
+          color: var(--accent-blue);
+          transform: translateY(-1px);
         }
 
         .footer-author {
