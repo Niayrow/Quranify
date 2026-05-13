@@ -168,7 +168,10 @@ export default function RadioMode({
       <style jsx>{`
         .radio-overlay {
           position: fixed;
-          inset: 0;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
           z-index: 6000;
           background: #020617;
           display: flex;
@@ -176,6 +179,11 @@ export default function RadioMode({
           justify-content: center;
           overflow: hidden;
           animation: fadeIn 0.4s ease-out;
+          /* Prevent any touch scrolling or bouncing */
+          touch-action: none;
+          overscroll-behavior: none;
+          /* Handle safe areas (iPhone notch, etc.) */
+          padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
         }
 
         .radio-bg-glow {

@@ -752,11 +752,25 @@ export default function Home() {
                 if (!isPlaying && surahs.length > 0) {
                   handleRadioNext(); // Start immediately if not playing
                 }
-                if (document.documentElement.requestFullscreen) {
+                // Only use fullscreen on desktop — on mobile it causes layout shift
+                const isDesktop = window.innerWidth > 768;
+                if (isDesktop && document.documentElement.requestFullscreen) {
                   document.documentElement.requestFullscreen().catch(() => {});
                 }
+                // Lock body scroll to prevent hidden offset accumulation
+                document.body.style.overflow = 'hidden';
+                document.body.style.position = 'fixed';
+                document.body.style.width = '100%';
+                document.body.style.top = `-${window.scrollY}px`;
                 setIsRadioMode(true);
               } else {
+                // Restore scroll position
+                const scrollY = document.body.style.top;
+                document.body.style.overflow = '';
+                document.body.style.position = '';
+                document.body.style.width = '';
+                document.body.style.top = '';
+                window.scrollTo(0, parseInt(scrollY || '0') * -1);
                 if (document.fullscreenElement) {
                   document.exitFullscreen().catch(() => {});
                 }
@@ -1091,6 +1105,13 @@ export default function Home() {
           reciter={selectedReciter}
           isPlaying={isPlaying}
           onClose={() => {
+            // Restore scroll position
+            const scrollY = document.body.style.top;
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.top = '';
+            window.scrollTo(0, parseInt(scrollY || '0') * -1);
             if (document.fullscreenElement) {
               document.exitFullscreen().catch(() => {});
             }
@@ -1843,7 +1864,7 @@ export default function Home() {
         }
 
         .surah-list.grid {
-          grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
         }
 
         .surah-list.list {
@@ -2005,12 +2026,12 @@ export default function Home() {
 
         @media (max-width: 640px) {
           .app-container {
-            padding: 1rem 1rem 7rem;
+            padding: 1rem 0.75rem 7rem;
           }
           .header-top {
             flex-direction: column;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
           }
           .logo {
             justify-content: center;
@@ -2022,9 +2043,92 @@ export default function Home() {
           }
           .header-actions {
             justify-content: center;
+            width: 100%;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+            flex-wrap: nowrap;
+            gap: 0.5rem;
+            padding-bottom: 0.25rem;
+          }
+          .header-actions::-webkit-scrollbar {
+            display: none;
+          }
+          .header-action-btn {
+            padding: 0.4rem 0.7rem;
+            font-size: 0.78rem;
+            white-space: nowrap;
+            flex-shrink: 0;
+          }
+          .fav-toggle-btn {
+            padding: 0.4rem 0.7rem;
+            font-size: 0.78rem;
+            white-space: nowrap;
+            flex-shrink: 0;
           }
           .logo h1 {
             font-size: 1.25rem;
+          }
+          .reciter-selector {
+            padding: 0.6rem 0.75rem;
+            border-radius: 0.85rem;
+          }
+          .reciter-sel-name {
+            font-size: 0.85rem;
+          }
+          .stats-bar {
+            flex-wrap: wrap;
+          }
+          .stat-badge {
+            font-size: 0.72rem;
+            padding: 0.3rem 0.6rem;
+          }
+          .surah-list.grid {
+            grid-template-columns: 1fr;
+            gap: 0.75rem;
+          }
+          .history-card {
+            padding: 0.4rem 0.75rem 0.4rem 0.5rem;
+          }
+        }
+
+        @media (max-width: 380px) {
+          .app-container {
+            padding: 0.75rem 0.5rem 7rem;
+          }
+          .header-actions {
+            gap: 0.35rem;
+          }
+          .header-action-btn span,
+          .fav-toggle-btn span {
+            display: none;
+          }
+          .header-action-btn {
+            padding: 0.45rem;
+            border-radius: 10px;
+          }
+          .fav-toggle-btn {
+            padding: 0.45rem;
+            border-radius: 10px;
+          }
+          .view-toggle-wrap {
+            flex-shrink: 0;
+          }
+          .search-wrap {
+            padding: 0.5rem 0.75rem;
+            gap: 0.5rem;
+          }
+          .search-wrap input {
+            font-size: 0.85rem;
+          }
+          .reciter-sel-info {
+            max-width: 160px;
+          }
+          .reciter-sel-name {
+            font-size: 0.8rem;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
           }
         }
 

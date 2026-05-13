@@ -60,13 +60,22 @@ export default function AudioPlayer({
   };
 
   const wakeLockRef = useRef<any>(null);
+  const wasPlayingBeforeHidden = useRef(false);
 
   const requestWakeLock = useCallback(async () => {
-    if ('wakeLock' in navigator && !wakeLockRef.current) {
+    if ('wakeLock' in navigator) {
+      // Release old one first if exists
+      if (wakeLockRef.current) {
+        try { await wakeLockRef.current.release(); } catch (e) {}
+        wakeLockRef.current = null;
+      }
       try {
         wakeLockRef.current = await (navigator as any).wakeLock.request('screen');
+        wakeLockRef.current.addEventListener('release', () => {
+          wakeLockRef.current = null;
+        });
       } catch (err) {
-        console.warn("Wake Lock request failed");
+        console.warn("Wake Lock request failed:", err);
       }
     }
   }, []);
@@ -87,19 +96,71 @@ export default function AudioPlayer({
     } else {
       releaseWakeLock();
     }
+    return () => { releaseWakeLock(); };
+  }, [isPlaying, requestWakeLock, releaseWakeLock]);
 
+  // Background playback resilience: detect when phone screen turns off/on
+  // and auto-resume audio playback + re-acquire wake lock
+  useEffect(() => {
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isPlaying) {
+      if (document.visibilityState === 'hidden') {
+        // Page is being hidden (screen off or tab switch)
+        wasPlayingBeforeHidden.current = isPlaying;
+      } else if (document.visibilityState === 'visible') {
+        // Page is visible again - re-acquire wake lock
+        if (isPlaying || wasPlayingBeforeHidden.current) {
+          requestWakeLock();
+        }
+
+        // Resume AudioContext if it was suspended
+        if (audioCtxRef.current?.state === 'suspended') {
+          audioCtxRef.current.resume().catch(() => {});
+        }
+
+        // Auto-resume audio if it was playing before screen turned off
+        if (wasPlayingBeforeHidden.current && audioRef.current) {
+          const audio = audioRef.current;
+          if (audio.paused && !audio.ended) {
+            // Small delay to let the browser fully restore
+            setTimeout(() => {
+              audio.play().then(() => {
+                setIsPlaying(true);
+                onPlayStateChange?.(true);
+              }).catch(() => {
+                // Retry once more after a longer delay
+                setTimeout(() => {
+                  audio.play().then(() => {
+                    setIsPlaying(true);
+                    onPlayStateChange?.(true);
+                  }).catch(() => {});
+                }, 1000);
+              });
+            }, 300);
+          }
+        }
+      }
+    };
+
+    // Also handle the 'focus' event as a backup for some mobile browsers
+    const handleFocus = () => {
+      if (wasPlayingBeforeHidden.current && audioRef.current?.paused && !audioRef.current?.ended) {
+        audioRef.current.play().then(() => {
+          setIsPlaying(true);
+          onPlayStateChange?.(true);
+        }).catch(() => {});
+      }
+      if (isPlaying) {
         requestWakeLock();
       }
     };
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      releaseWakeLock();
+      window.removeEventListener('focus', handleFocus);
     };
-  }, [isPlaying, requestWakeLock, releaseWakeLock]);
+  }, [isPlaying, requestWakeLock, onPlayStateChange]);
 
   // Auto-play on URL change
   useEffect(() => {
@@ -166,12 +227,27 @@ export default function AudioPlayer({
     }
   }, [audioUrl, surahName, reciterName, reciterImage, onNext, onPrevious, togglePlay]);
 
-  // Sync playback state with Media Session
+  // Sync playback state and position with Media Session
   useEffect(() => {
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
     }
   }, [isPlaying]);
+
+  // Keep Media Session position state updated for lock screen controls
+  useEffect(() => {
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+      if (duration > 0 && isFinite(duration)) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: duration,
+            playbackRate: playbackSpeed,
+            position: Math.min(currentTime, duration),
+          });
+        } catch (e) {}
+      }
+    }
+  }, [currentTime, duration, playbackSpeed]);
 
   // Sleep Timer logic
   useEffect(() => {

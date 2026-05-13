@@ -1,4 +1,4 @@
-const CACHE_NAME = 'quranify-cache-v3';
+const CACHE_NAME = 'quranify-cache-v4';
 const AUDIO_CACHE = 'quranify-audio';
 
 // Only cache truly static assets
