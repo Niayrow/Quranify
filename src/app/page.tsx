@@ -1275,6 +1275,8 @@ export default function Home() {
 
       <style jsx>{`
         .app-container {
+          width: 100%;
+          min-width: 0;
           max-width: 900px;
           margin: 0 auto;
           padding: 1.5rem 1.5rem 6rem;
@@ -1286,6 +1288,7 @@ export default function Home() {
           flex-direction: column;
           gap: 1rem;
           margin-bottom: 1.5rem;
+          min-width: 0;
         }
 
         .header-top {
@@ -1334,11 +1337,12 @@ export default function Home() {
         }
 
         .header-actions {
-
           display: flex;
           align-items: center;
           gap: 0.75rem;
           flex-wrap: wrap;
+          min-width: 0;
+          max-width: 100%;
         }
 
         .logo {
@@ -2042,8 +2046,10 @@ export default function Home() {
             width: 100%;
           }
           .header-actions {
-            justify-content: center;
+            justify-content: flex-start;
             width: 100%;
+            max-width: 100%;
+            min-width: 0;
             overflow-x: auto;
             scrollbar-width: none;
             -ms-overflow-style: none;
