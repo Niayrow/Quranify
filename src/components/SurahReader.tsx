@@ -277,8 +277,8 @@ export default function SurahReader({
                     background-image: 
                         radial-gradient(circle at 50% -20%, rgba(56, 189, 248, 0.15) 0%, transparent 50%),
                         radial-gradient(circle at 0% 100%, rgba(15, 23, 42, 0.5) 0%, transparent 50%);
-                    width: 100vw;
-                    height: 100vh;
+                    width: 100%;
+                    height: 100%;
                     position: relative;
                     display: flex;
                     flex-direction: column;

@@ -3,7 +3,6 @@ const AUDIO_CACHE = 'quranify-audio';
 
 // Only cache truly static assets
 const STATIC_ASSETS = [
-  '/',
   '/icon-512.png',
   '/icon.png',
   '/manifest.json'
